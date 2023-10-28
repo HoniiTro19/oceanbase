@@ -50,7 +50,8 @@ ObMySQLConnection::ObMySQLConnection() :
     mysql_int_err_(0),
     async_status_(0),
     cur_cont_func_(ContFuncDefID::END),
-    alloc_(ObModIds::MYSQL_CLIENT_CACHE)
+    alloc_(ObModIds::MYSQL_CLIENT_CACHE),
+    conn_status_(ConnStatus::INIT)
 {
   memset(&mysql_, 0, sizeof(MYSQL));
 }
@@ -103,7 +104,6 @@ int ObMySQLConnection::init(ObServerConnectionPool *pool)
   return ret;
 }
 
-
 void ObMySQLConnection::set_timeout(const int64_t timeout)
 {
   timeout_ = timeout;
@@ -121,6 +121,15 @@ void ObMySQLConnection::reset()
   error_times_ = 0;
   succ_times_ = 0;
   set_last_error(OB_SUCCESS);
+}
+
+int ObMySQLConnection::create_statement(ObMySQLStatement &stmt, const char *sql) 
+{
+  int ret = OB_SUCCESS;
+  if (OB_FAIL(stmt.init(*this, sql))) {
+    LOG_WARN("fail to init prepared statement", K(ret));
+  }
+  return ret;
 }
 
 int ObMySQLConnection::create_statement(ObMySQLStatement &stmt, const uint64_t tenant_id, const char *sql)
@@ -300,6 +309,35 @@ void ObMySQLConnection::close()
   }
 }
 
+int ObMySQLConnection::start_transaction_async(bool with_snap_shot)
+{
+  int ret = OB_SUCCESS;
+  if (OB_UNLIKELY(closed_)) {
+    ret = OB_NOT_INIT;
+    LOG_WARN("connection not establised. call connet first", K(ret));
+  } else if (OB_UNLIKELY(ObMySQLConnection::ConnStatus::PENDING == conn_status_)) {
+    ret = OB_ERR_UNEXPECTED;
+    LOG_WARN("async result is not ready. the connection is not usable now.", K(ret));
+  } else if (with_snap_shot) {
+    if (OB_LIKELY(async_status_ = mysql_real_query_start(&mysql_int_err_, &mysql_, "START TRANSACTION WITH CONSISTENT SNAPSHOT", 42))) {
+      cur_cont_func_ = ContFuncDefID::CONT_FUNC_START_TXN;
+      conn_status_ = ObMySQLConnection::ConnStatus::PENDING;
+    } else if (OB_UNLIKELY(mysql_int_err_)) {
+      ret = -mysql_errno(&mysql_);
+      LOG_WARN("fail to start transaction async with snapshot", "info", mysql_error(&mysql_), K(ret));
+    }
+  } else {
+    if (OB_LIKELY(async_status_ = mysql_real_query_start(&mysql_int_err_, &mysql_, "START TRANSACTION", 17))) {
+      cur_cont_func_ = ContFuncDefID::CONT_FUNC_START_TXN;
+      conn_status_ = ObMySQLConnection::ConnStatus::PENDING;
+    } else if (OB_UNLIKELY(mysql_int_err_)) {
+      ret = -mysql_errno(&mysql_);
+      LOG_WARN("fail to start transaction async", "info", mysql_error(&mysql_), K(ret));
+    }
+  }
+  return ret;
+}
+
 int ObMySQLConnection::start_transaction(const uint64_t &tenant_id, bool with_snap_shot/* = false*/)
 {
   int ret = OB_SUCCESS;
@@ -308,6 +346,9 @@ int ObMySQLConnection::start_transaction(const uint64_t &tenant_id, bool with_sn
   if (OB_UNLIKELY(closed_)) {
     ret = OB_NOT_INIT;
     LOG_WARN("connection not established. call connect first", K(ret));
+  } else if (OB_UNLIKELY(ObMySQLConnection::ConnStatus::PENDING == conn_status_)) {
+    ret = OB_ERR_UNEXPECTED;
+    LOG_WARN("async result is not ready. the connection is not usable now.", K(ret));
   } else if (with_snap_shot) {
     if (0 != mysql_real_query(&mysql_, "START TRANSACTION WITH CONSISTENT SNAPSHOT", 42)) {
       ret = -mysql_errno(&mysql_);
@@ -328,6 +369,9 @@ int ObMySQLConnection::rollback()
   if (OB_UNLIKELY(closed_)) {
     ret = OB_NOT_INIT;
     LOG_WARN("connection not established. call connect first", K(ret));
+  } else if (OB_UNLIKELY(ObMySQLConnection::ConnStatus::PENDING == conn_status_)) {
+    ret = OB_ERR_UNEXPECTED;
+    LOG_WARN("async result is not ready. the connection is not usable now.", K(ret));
   } else {
     if (0 != mysql_rollback(&mysql_)) {
       ret = -mysql_errno(&mysql_);
@@ -343,6 +387,9 @@ int ObMySQLConnection::commit()
   if (OB_UNLIKELY(closed_)) {
     ret = OB_NOT_INIT;
     LOG_WARN("connection not established. call connect first", K(ret));
+  } else if (OB_UNLIKELY(ObMySQLConnection::ConnStatus::PENDING == conn_status_)) {
+    ret = OB_ERR_UNEXPECTED;
+    LOG_WARN("async result is not ready. the connection is not usable now.", K(ret));
   } else {
     if (0 != mysql_commit(&mysql_)) {
       ret = -mysql_errno(&mysql_);
@@ -518,6 +565,9 @@ int ObMySQLConnection::execute_write(const uint64_t tenant_id, const char *sql,
   if (OB_UNLIKELY(closed_)) {
     ret = OB_NOT_INIT;
     LOG_WARN("connection not established. call connect first", K(ret));
+  } else if (OB_UNLIKELY(ConnStatus::PENDING == conn_status_)) {
+    ret = OB_ERR_UNEXPECTED;
+    LOG_WARN("async result is not ready. the connection is not usable now.", K(ret));
   } else {
     ObMySQLStatement stmt;
     if (OB_FAIL(create_statement(stmt, tenant_id, sql))) {
@@ -525,6 +575,60 @@ int ObMySQLConnection::execute_write(const uint64_t tenant_id, const char *sql,
     } else if (OB_FAIL(stmt.execute_update(affected_rows))) {
       LOG_WARN("statement execute update failed", KCSTRING(sql), K(ret));
     }
+  }
+  return ret;
+}
+
+int ObMySQLConnection::execute_write(const char *sql, int64_t &affected_rows) 
+{
+  int ret = OB_SUCCESS;
+  if (OB_UNLIKELY(closed_)) {
+    ret = OB_NOT_INIT;
+    LOG_WARN("connection not established. call connect first", K(ret));
+  } else if (OB_UNLIKELY(ConnStatus::PENDING == conn_status_)) {
+    ret = OB_ERR_UNEXPECTED;
+    LOG_WARN("async result is not ready. the connection is not usable now.", K(ret));
+  } else {
+    ObMySQLStatement stmt;
+    if (OB_FAIL(create_statement(stmt, sql))) {
+      LOG_WARN("create statement failed", KCSTRING(sql), K(ret));
+    } else if (OB_FAIL(stmt.execute_update(affected_rows))) {
+      LOG_WARN("statement execute update failed", KCSTRING(sql), K(ret));
+    }
+  }
+  return ret;
+}
+
+int ObMySQLConnection::execute_write_async(ObMySQLPreparedStatement &stmt)
+{
+  int ret = OB_SUCCESS;
+  if (OB_UNLIKELY(closed_)) {
+    ret = OB_NOT_INIT;
+    LOG_WARN("connection not established. call connect first", K(ret));
+  } else if (OB_UNLIKELY(ConnStatus::PENDING == conn_status_)) {
+    ret = OB_ERR_UNEXPECTED;
+    LOG_WARN("async result is not ready. the connection is not usable now.", K(ret));
+  } else if (OB_FAIL(stmt.execute_update_async())) {
+    LOG_WARN("async update start failed", KCSTRING(stmt.get_stmt_sql()), K(ret));
+  } else {
+    mysql_stmt_ = stmt.get_stmt_handler();
+    LOG_DEBUG("async update started", K(get_server()), KCSTRING(stmt.get_stmt_sql()), K(ret));
+  }
+  return ret;
+}
+
+int ObMySQLConnection::get_async_write_result(int64_t &affected_rows)
+{
+  int ret = OB_SUCCESS;
+  if (OB_UNLIKELY(closed_)) {
+    ret = OB_NOT_INIT;
+    LOG_WARN("connection not established. call connect first", K(ret));
+  } else if (OB_UNLIKELY(ConnStatus::PENDING == conn_status_)) {
+    ret = OB_ERR_UNEXPECTED;
+    LOG_WARN("async result is not ready. call get_conn_status first", K(ret));
+  } else {
+    affected_rows = mysql_stmt_affected_rows(mysql_stmt_);
+    LOG_DEBUG("get async write result", K(affected_rows), K(ret));
   }
   return ret;
 }
@@ -547,6 +651,9 @@ int ObMySQLConnection::execute_read(const uint64_t tenant_id, const char *sql,
   if (OB_UNLIKELY(closed_)) {
     ret = OB_NOT_INIT;
     LOG_WARN("connection not established. call connect first", K(ret));
+  } else if (OB_UNLIKELY(ConnStatus::PENDING == conn_status_)) {
+    ret = OB_ERR_UNEXPECTED;
+    LOG_WARN("async result is not ready. the connection is not usable now.", K(ret));
   } else if (OB_FAIL(res.create_handler(read_ctx))) {
     LOG_ERROR("create result handler failed", K(ret));
   } else if (OB_FAIL(create_statement(read_ctx->stmt_, tenant_id, sql))) {
@@ -561,6 +668,86 @@ int ObMySQLConnection::execute_read(const uint64_t tenant_id, const char *sql,
     }
   } else {
     LOG_DEBUG("query succeed", K(get_server()), KCSTRING(sql), K(ret));
+  }
+  return ret;
+}
+
+int ObMySQLConnection::execute_read(const char *sql, ObISQLClient::ReadResult &res) 
+{
+  int ret = OB_SUCCESS;
+  ObMySQLReadContext *read_ctx = NULL;
+  if (OB_UNLIKELY(closed_)) {
+    ret = OB_NOT_INIT;
+    LOG_WARN("connection not established. call connect first", K(ret));
+  } else if (OB_UNLIKELY(ConnStatus::PENDING == conn_status_)) {
+    ret = OB_ERR_UNEXPECTED;
+    LOG_WARN("async result is not ready. the connection is not usable now.", K(ret));
+  } else if (OB_FAIL(res.create_handler(read_ctx))) {
+    LOG_ERROR("create result handler failed", K(ret));
+  } else if (OB_FAIL(create_statement(read_ctx->stmt_, sql))) {
+    LOG_ERROR("create statement failed", KCSTRING(sql), K(ret));
+  } else if (OB_ISNULL(read_ctx->result_ = read_ctx->stmt_.execute_query(res.is_enable_use_result()))) {
+    ret = get_last_error();
+    LOG_WARN("query failed", K(get_server()), KCSTRING(sql), K(ret));
+  } else {
+    LOG_DEBUG("query succeed", K(get_server()), KCSTRING(sql), K(ret));
+  }
+  return ret;
+}
+
+int ObMySQLConnection::execute_read(ObMySQLPreparedStatement &stmt, ObISQLClient::ReadResult &res) 
+{
+  int ret = OB_SUCCESS;
+  ObMySQLReadContext *read_ctx = NULL;
+  if (OB_UNLIKELY(closed_)) {
+    ret = OB_NOT_INIT;
+    LOG_WARN("connection not established. call connect first", K(ret));
+  } else if (OB_UNLIKELY(ConnStatus::PENDING == conn_status_)) {
+    ret = OB_ERR_UNEXPECTED;
+    LOG_WARN("async result is not ready. the connection is not usable now.", K(ret));
+  } else if (OB_FAIL(res.create_handler(read_ctx))) {
+    LOG_ERROR("create result handler failed", K(ret));
+  } else if (OB_FAIL(stmt.execute_query(read_ctx->result_, res.is_enable_use_result()))) {
+    ret = get_last_error();
+    LOG_WARN("query failed", K(get_server()), KCSTRING(stmt.get_stmt_sql()), K(ret));
+  } else {
+    LOG_DEBUG("query succeed", K(get_server()), KCSTRING(stmt.get_stmt_sql()), K(ret));
+  }
+  return ret;
+}
+
+int ObMySQLConnection::execute_read_async(ObMySQLPreparedStatement &stmt)
+{
+  int ret = OB_SUCCESS;
+  if (OB_UNLIKELY(closed_)) {
+    ret = OB_NOT_INIT;
+    LOG_WARN("connection not established. call connect first", K(ret));
+  } else if (OB_UNLIKELY(ConnStatus::PENDING == conn_status_)) {
+    ret = OB_ERR_UNEXPECTED;
+    LOG_WARN("async result is not ready. the connection is not usable now.", K(ret));
+  } else if (OB_FAIL(stmt.execute_query_async())) {
+    LOG_WARN("async query failed", K(get_server()), KCSTRING(stmt.get_stmt_sql()), K(ret));
+  } else {
+    mysql_stmt_ = stmt.get_stmt_handler();
+    LOG_DEBUG("async query started", K(get_server()), KCSTRING(stmt.get_stmt_sql()), K(ret));
+  }
+  return ret;
+}
+
+int ObMySQLConnection::get_async_read_result(ObMySQLPreparedStatement &stmt, ObISQLClient::ReadResult &res)
+{
+  int ret = OB_SUCCESS;
+  ObMySQLReadContext *read_ctx = NULL;
+  if (OB_UNLIKELY(closed_)) {
+    ret = OB_NOT_INIT;
+    LOG_WARN("connection not established. call connect first", K(ret));
+  } else if (OB_UNLIKELY(ConnStatus::PENDING == conn_status_)) {
+    ret = OB_ERR_UNEXPECTED;
+    LOG_WARN("async result is not ready. call get_conn_status first.", K(ret));
+  } else if (OB_FAIL(res.create_handler(read_ctx))) {
+    LOG_WARN("create result handler failed", K(ret));
+  } else if (OB_FAIL(stmt.get_async_read_result(read_ctx->result_))) {
+    LOG_WARN("failed to get async read result from prepared statement.", K(ret));
   }
   return ret;
 }
@@ -672,13 +859,13 @@ int ObMySQLConnection::reset_read_consistency()
   return ret;
 }
 
-int ObMySQLConnection::connect_dblink(const bool use_ssl, int64_t sql_request_level)
+int ObMySQLConnection::connect_dblink(const bool use_ssl, int64_t sql_request_level, bool async)
 {
   int ret = OB_SUCCESS;
   if (OB_ISNULL(root_)) {
     ret = OB_ERR_UNEXPECTED;
     LOG_WARN("root is NULL", K(ret));
-  } else if (OB_FAIL(connect(root_->get_db_user(), root_->get_db_pass(), root_->get_db_name(), use_ssl, true, sql_request_level))) {
+  } else if (OB_FAIL(connect(root_->get_db_user(), root_->get_db_pass(), root_->get_db_name(), use_ssl, true, sql_request_level, async))) {
     LOG_WARN("fail to connect", K(ret));
   }
   return ret;
@@ -702,7 +889,6 @@ int ObMySQLConnection::wait_for_mysql()
   res = poll(&pfd, 1, timeout);
   if (res <= 0) {
     ret = OB_NEED_RETRY;
-    LOG_WARN("poll mysql socket fail");
   } else {
     async_status_ = 0;
     if (pfd.revents & POLLIN) {
@@ -724,8 +910,12 @@ int ObMySQLConnection::commit_async()
   if (OB_UNLIKELY(closed_)) {
     ret = OB_NOT_INIT;
     LOG_WARN("connection not established. call connect first", K(ret));
+  } else if (OB_UNLIKELY(ObMySQLConnection::ConnStatus::PENDING == conn_status_)) {
+    ret = OB_ERR_UNEXPECTED;
+    LOG_WARN("async result is not ready. the connection is not usable now.", K(ret));
   } else if (OB_LIKELY(async_status_ = mysql_commit_start(&mysql_bool_err_, &mysql_))) {
-    cur_cont_func_ = ContFuncDefID::CONT_FUNC_COMMIT;
+    cur_cont_func_ = ContFuncDefID::CONT_FUNC_COMMIT_TXN;
+    conn_status_ = ObMySQLConnection::ConnStatus::PENDING;
   } else if (OB_UNLIKELY(mysql_bool_err_)) {
     ret = -mysql_errno(&mysql_);
     LOG_WARN("commit fail", "info", mysql_error(&mysql_), K(ret));
@@ -739,8 +929,12 @@ int ObMySQLConnection::rollback_async()
   if (OB_UNLIKELY(closed_)) {
     ret = OB_NOT_INIT;
     LOG_WARN("connection not established. call connect first", K(ret));
+  } else if (OB_UNLIKELY(ObMySQLConnection::ConnStatus::PENDING == conn_status_)) {
+    ret = OB_ERR_UNEXPECTED;
+    LOG_WARN("async result is not ready. the connection is not usable now.", K(ret));
   } else if (OB_LIKELY(async_status_ = mysql_rollback_start(&mysql_bool_err_, &mysql_))) {
-      cur_cont_func_ = ContFuncDefID::CONT_FUNC_ROLLBACK;
+    cur_cont_func_ = ContFuncDefID::CONT_FUNC_ROLLBACK_TXN;
+    conn_status_ = ObMySQLConnection::ConnStatus::PENDING;
   } else if (OB_UNLIKELY(mysql_bool_err_)) {
     ret = -mysql_errno(&mysql_);
     LOG_WARN("rollback fail", "info", mysql_error(&mysql_), K(ret));
@@ -748,49 +942,80 @@ int ObMySQLConnection::rollback_async()
   return ret;
 }
 
-int ObMySQLConnection::get_cont_status(ObMySQLPreparedStatement *cur_stmt /*NULL*/)
+int ObMySQLConnection::get_conn_status()
 {
-  if (cur_stmt) {
-    mysql_stmt_ = cur_stmt->get_stmt_handler();
+  int ret = OB_SUCCESS;
+  if (OB_UNLIKELY(nullptr == cont_funcs_[cur_cont_func_])) {
+    ret = OB_NOT_INIT;
+    LOG_WARN("mysql async continue function not init", K(cur_cont_func_));  
+  } else if (OB_FAIL(wait_for_mysql())) {
+    LOG_WARN("poll mysql socket failed or timeout");
+  } else {
+    return cont_funcs_[cur_cont_func_]->run_func();
   }
-  return cont_funcs_[cur_cont_func_]->run_func();
+  return ret;
 }
 
-#define RUN_CONT_FUNC(id, conn)                                                       \
-  ({                                                                                  \
-    if (nullptr != cont_funcs_[id]) {                                                 \
-      ret = cont_funcs_[idx]->run_func(conn);                                         \
-    } else {                                                                          \
-      ret = OB_NOT_INIT;                                                              \
-      LOG_WARN("mysql async continue function not init", K(id));                      \
-    }                                                                                 \
-    ret;                                                                              \
-  })                                                                                                            
-
-bool ObConnectContFunc::run_func() { return false; }
-bool ObQueryContFunc::run_func() { return false; }
-bool ObUpdateContFunc::run_func() { return false; }
-bool ObStmtQueryContFunc::run_func() { return false; }
-
-bool ObStmtUpdateContFunc::run_func() 
+int ObContFunc::update_connection_status()
 {
-  conn_->async_status_ = conn_->wait_for_mysql();
+  if (OB_UNLIKELY(conn_->mysql_int_err_)) {
+    conn_->conn_status_ = ObMySQLConnection::ConnStatus::ERROR;
+    return OB_ERR_UNEXPECTED;  
+  } else if (OB_LIKELY(conn_->async_status_)) {
+    conn_->conn_status_ = ObMySQLConnection::ConnStatus::PENDING;
+    return OB_NEED_RETRY;
+  } else {
+    conn_->conn_status_ = ObMySQLConnection::ConnStatus::SUCCESS;
+    return OB_SUCCESS;
+  }
+}
+
+int ObContFunc::update_stmt_connection_status()
+{
+  if (OB_UNLIKELY(conn_->mysql_bool_err_)) {
+    conn_->conn_status_ = ObMySQLConnection::ConnStatus::ERROR;
+    return OB_ERR_UNEXPECTED;
+  } else if (OB_LIKELY(conn_->async_status_)) {
+    conn_->conn_status_ = ObMySQLConnection::ConnStatus::PENDING;
+    return OB_NEED_RETRY;
+  } else {
+    conn_->conn_status_ = ObMySQLConnection::ConnStatus::SUCCESS;
+    return OB_SUCCESS;
+  }
+}
+
+int ObConnectContFunc::run_func() { return OB_NOT_IMPLEMENT; }
+int ObQueryContFunc::run_func() { return OB_NOT_IMPLEMENT; }
+int ObUpdateContFunc::run_func() { return OB_NOT_IMPLEMENT; }
+
+int ObStmtQueryContFunc::run_func() 
+{
   conn_->async_status_ = mysql_stmt_execute_cont(&conn_->mysql_int_err_, conn_->mysql_stmt_, conn_->async_status_);
-  return conn_->async_status_ || conn_->mysql_int_err_;
+  return update_stmt_connection_status();
 }
 
-bool ObCommitContFunc::run_func() 
+int ObStmtUpdateContFunc::run_func() 
 {
-  conn_->async_status_ = conn_->wait_for_mysql();
+  conn_->async_status_ = mysql_stmt_execute_cont(&conn_->mysql_int_err_, conn_->mysql_stmt_, conn_->async_status_);
+  return update_stmt_connection_status();
+}
+
+int ObStartContFunc::run_func()
+{
+  conn_->async_status_ = mysql_real_query_cont(&conn_->mysql_int_err_, &conn_->mysql_, conn_->async_status_);
+  return update_stmt_connection_status();
+}
+
+int ObCommitContFunc::run_func() 
+{
   conn_->async_status_ = mysql_commit_cont(&conn_->mysql_bool_err_, &conn_->mysql_, conn_->async_status_);
-  return conn_->async_status_ || conn_->mysql_bool_err_;
+  return update_connection_status();
 }
 
-bool ObRollbackContFunc::run_func() 
+int ObRollbackContFunc::run_func() 
 {
-  conn_->async_status_ = conn_->wait_for_mysql();
   conn_->async_status_ = mysql_rollback_cont(&conn_->mysql_bool_err_, &conn_->mysql_, conn_->async_status_);
-  return conn_->async_status_ || conn_->mysql_bool_err_;
+  return update_connection_status();
 }
 
 } // end namespace sqlclient
