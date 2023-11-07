@@ -32,8 +32,7 @@ ObMySQLPreparedStatement::ObMySQLPreparedStatement() :
     param_(*this),
     result_(*this),
     stmt_param_count_(0),
-    stmt_(NULL),
-    sql_str_(NULL)
+    stmt_(NULL)
 {
 }
 
@@ -43,8 +42,7 @@ ObMySQLPreparedStatement::ObMySQLPreparedStatement(ObArenaAllocator *arena_alloc
     param_(*this),
     result_(*this),
     stmt_param_count_(0),
-    stmt_(NULL),
-    sql_str_(NULL)
+    stmt_(NULL)
 {
 }
 
@@ -91,12 +89,6 @@ int ObMySQLPreparedStatement::init(ObMySQLConnection &conn, const char *sql)
     LOG_WARN("fail to init prepared result", K(ret));
   } else if (OB_FAIL(result_.init())) {
     LOG_WARN("fail to init prepared result", K(ret));
-  } else if (OB_ISNULL(sql_str_ = (char *)alloc_->alloc(STRLEN(sql) * sizeof(char)))) {
-    ret = OB_ALLOCATE_MEMORY_FAILED;
-    sql_str_ = NULL;
-    LOG_WARN("fail to init sql for prepared statement");
-  } else {
-    LOG_INFO("conn_handler", "handler", conn_->get_handler(), K_(stmt));
   }
   return ret;
 }
@@ -212,11 +204,6 @@ int ObMySQLPreparedStatement::execute_query_async()
     conn_->conn_status_ = ObMySQLConnection::ConnStatus::SUCCESS;
   }
   return ret;
-}
-
-const char *ObMySQLPreparedStatement::get_stmt_sql() const 
-{
-  return sql_str_;
 }
 
 int ObMySQLPreparedStatement::set_int(const int64_t col_idx, const int64_t int_val)

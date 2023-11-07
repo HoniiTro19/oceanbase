@@ -16,33 +16,120 @@
 
 #include "ob_testbench_options.h"
 #include "ob_testbench_mysql_proxy.h"
+#include "ob_testbench_statistics_collector.h"
+#include "lib/string/ob_sql_string.h"
+#include "lib/mysqlclient/ob_mysql_prepared_statement.h"
+#include "lib/time/ob_time_utility.h"
 
 namespace oceanbase
 {
   namespace testbench
   {
+    typedef ObArrayWrap<ObMySQLConnection *> Connections;
+    typedef ObArrayWrap<ObMySQLPreparedStatement> PreparedStatements;
+    typedef ObArrayWrap<int64_t> Latencys;
+    typedef ObArrayWrap<bool> Commits;
+    typedef ObArray<int64_t> Parameters;
+
+    struct BasicTaskConfig {
+      const char *table_name;
+      int64_t connections;
+      ObTestbenchStatisticsCollector *collector;
+      uint64_t dblink_id;
+      ObMySQLConnectionPool *connection_pool;
+      Parameters partition_id;
+      int64_t row_id_start;
+      TO_STRING_KV(K(table_name), K(connections), KP(collector), K(dblink_id), KP(connection_pool), K(partition_id), K(row_id_start));
+    };
+
     class ObIWorkloadTransactionTask
     {
     public:
-      ObIWorkloadTransactionTask();
+      ObIWorkloadTransactionTask(BasicTaskConfig config);
       virtual ~ObIWorkloadTransactionTask();
-      virtual int parameter_instantiation() = 0;
-      virtual int get_database_conn() = 0;
-      virtual int execute_commands() = 0;
+      virtual WorkloadType get_type() = 0;
+      virtual int init();
+      virtual int execute_transactions() = 0;
+
+    protected:
+      virtual int prepare_arrays();
+      virtual int wait_for_connection(ObMySQLConnection *conn);
+      virtual int record_latency(ObLatencyTaskType type, int64_t latency);
+      virtual int wait_and_bind_param(int64_t conn_idx, int64_t &partition_id, int64_t &row_id, ObMySQLPreparedStatement &stmt);
+      virtual int release_dblinks();
+
+    protected:
+      const char *table_name_;
+      int64_t connection_count_;
+      Connections connections_;
+      ObMySQLConnectionPool *connection_pool_;
+      ObTestbenchStatisticsCollector *latency_collector_;
+      uint64_t dblink_id_;
+      Parameters partition_id_;
+      int64_t row_id_start_;
+      Latencys latencys_;
+      Latencys cumulative_latencys_;
+      Commits commits_;
+      int64_t success_;
+      int64_t failure_;
+      ObArenaAllocator allocator_;
+      VIRTUAL_TO_STRING_KV(K(table_name_), K(connection_count_), K(dblink_id_), K(partition_id_), K(row_id_start_), K(latencys_), K(cumulative_latencys_), K(commits_), K(success_), K(failure_));
     };
 
-    template <enum WorkloadType>
-    class ObWorkloadTransactionTask;
-
-    template <>
-    class ObWorkloadTransactionTask<WorkloadType::DISTRIBUTED_TRANSACTION> : public ObIWorkloadTransactionTask
+    class ObDistributedTransactionTask : public ObIWorkloadTransactionTask
     {
     public:
-      ObWorkloadTransactionTask();
-      virtual ~ObWorkloadTransactionTask() override;
-      virtual int parameter_instantiation() override;
-      virtual int get_database_conn() override;
-      virtual int execute_commands() override;
+      ObDistributedTransactionTask(BasicTaskConfig basic_config, int64_t participants, int64_t operations);
+      virtual ~ObDistributedTransactionTask() override;
+      virtual WorkloadType get_type() override;
+      virtual int init() override;
+      virtual int execute_transactions() override;
+      virtual int release_dblinks() override;
+      INHERIT_TO_STRING_KV("ObIWorkloadTransactionTask", ObIWorkloadTransactionTask, K(participants_), K(operations_), K(lock_txn_sql_));
+
+    private:
+      int64_t participants_;
+      int64_t operations_;
+      const char *lock_txn_sql_format_;
+      ObSqlString lock_txn_sql_;
+      PreparedStatements lock_txn_stmts_;
+    };
+
+    class ObContentionTransactionTask : public ObIWorkloadTransactionTask
+    {
+    public:
+      ObContentionTransactionTask(BasicTaskConfig basic_config, int64_t aborts, int64_t operations);
+      virtual ~ObContentionTransactionTask() override;
+      virtual WorkloadType get_type() override;
+      virtual int init() override;
+      virtual int execute_transactions() override;
+      virtual int release_dblinks() override;
+      INHERIT_TO_STRING_KV("ObIWorkloadTransactionTask", ObIWorkloadTransactionTask, K(aborts_), K(operations_), K(lock_elr_sql_));
+
+    private:
+      int64_t aborts_;
+      int64_t operations_;
+      const char *lock_elr_sql_format_;
+      ObSqlString lock_elr_sql_;
+      PreparedStatements lock_elr_stmts_;
+    };
+
+    class ObDeadlockTransactionTask : public ObIWorkloadTransactionTask
+    {
+    public:
+      ObDeadlockTransactionTask(BasicTaskConfig basic_config, int64_t chains);
+      virtual ~ObDeadlockTransactionTask() override;
+      virtual WorkloadType get_type() override;
+      virtual int init() override;
+      virtual int execute_transactions() override;
+      virtual int release_dblinks() override;
+      INHERIT_TO_STRING_KV("ObIWorkloadTransactionTask", ObIWorkloadTransactionTask, K(chains_), K(lock_lcl_sql_));
+    
+    private:
+      int64_t chains_;
+      const char *lock_lcl_sql_format_;
+      ObSqlString lock_lcl_sql_;
+      PreparedStatements lock_lcl_stmts_;
     };
   }
 }

@@ -216,8 +216,9 @@ public:
   ObContFunc(ObMySQLConnection *conn) : conn_(conn) {}
   virtual ~ObContFunc() {}
   virtual int run_func() = 0;
-  int update_connection_status();
-  int update_stmt_connection_status();
+  int update_begin_status();
+  int update_commit_status();
+  int update_stmt_status();
 
 protected:
   ObMySQLConnection *conn_;
