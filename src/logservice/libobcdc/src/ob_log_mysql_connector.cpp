@@ -155,7 +155,7 @@ int ObLogMySQLConnector::query(MySQLQueryBase& query)
   } else {
     done = true;
   }
-
+  LOG_DEBUG("ObLogMySQLConnector::query", K(sql), K(ret));
   if (OB_SUCCESS == ret && !done) {
     ret = OB_NEED_RETRY;
   }

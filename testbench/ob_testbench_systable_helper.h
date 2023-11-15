@@ -27,6 +27,8 @@ typedef libobcdc::ObLogSysTableHelper::ClusterInfo ClusterInfo;
 typedef libobcdc::ObLogSysTableHelper::TenantInfo TenantInfo;
 typedef libobcdc::ObLogSysTableHelper::BatchSQLQuery BatchSQLQuery;
 typedef libobcdc::ObLogSysTableHelper::ObServerVersionInfo ObServerVersionInfo;
+typedef libobcdc::IObLogSysTableHelper::PartitionList PartitionList;
+typedef libobcdc::IObLogSysTableHelper::PartitionInfo PartitionInfo;
 
 class ObTestbenchSystableHelper {
 public:
@@ -58,6 +60,8 @@ public:
   int query_tenant_status(const uint64_t tenant_id,
                           share::schema::TenantStatus &tenant_status);
   int reset_connection();
+  int query_partition_info(const char *database_name, const char *table_name, PartitionInfo &partition_location);
+  bool is_not_inited();
 
 private:
   bool is_inited_;

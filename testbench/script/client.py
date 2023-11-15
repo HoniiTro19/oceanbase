@@ -120,6 +120,7 @@ class LocalClient(SafeStdio):
 class MySQLClient(SafeStdio):
     @staticmethod
     def connect(server, user="root", password="", database="", stdio=None):
+        time.sleep(1)
         ip = server.get_conf("ip_addr")
         port = server.get_conf("mysql_port")
         name = server.get_conf("server_name")
@@ -136,19 +137,19 @@ class MySQLClient(SafeStdio):
                     db = MySQL.connect(
                         host=ip, 
                         user=user, 
-                        port=int(port), 
-                        passwd=str(password),
-                        database=str(database)
+                        port=port, 
+                        passwd=password,
+                        database=database
                     )
                     cursor = db.cursor(cursorclass=MySQL.cursors.DictCursor)
                 else:
                     db = MySQL.connect(
                         host=ip,
                         user=user,
-                        port=int(port),
-                        password=str(password),
-                        database=str(database),
-                        cursorclass=MySQL.cursors.DictCursor,
+                        port=port,
+                        password=password,
+                        database=database,
+                        cursorclass=MySQL.cursors.DictCursor
                     )
                     cursor = db.cursor()
                 return cursor
