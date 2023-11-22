@@ -257,11 +257,12 @@ int ObTestbenchStatisticsCollector::push_task_(ObStatisticsTask *task) {
     ret = OB_NOT_INIT;
     TESTBENCH_LOG(ERROR, "statistics collector is not inited", K(ret));
   } else if (OB_ISNULL(task)) {
+    ret = OB_ERR_UNEXPECTED;
     TESTBENCH_LOG(ERROR, "task is null", K(ret));
   } else {
     while (OB_FAIL(TG_PUSH_TASK(tg_id_, task)) && OB_EAGAIN == ret) {
       ob_usleep(1000);
-      TESTBENCH_LOG(ERROR, "failed to push task", K(ret));
+      TESTBENCH_LOG(ERROR, "statistics collector push task failed", K(ret));
     }
   }
   return ret;
@@ -323,12 +324,8 @@ void ObTestbenchStatisticsCollector::handle(void *task) {
     ret = OB_NOT_INIT;
     TESTBENCH_LOG(ERROR, "statistics collector is not inited", K(ret));
   } else if (OB_ISNULL(task_to_handle)) {
-    ret = OB_INVALID_ARGUMENT;
-    TESTBENCH_LOG(ERROR, "task is null", K(ret));
-  } else if (IS_NOT_INIT) {
-    ret = OB_NOT_INIT;
-    task_to_handle = nullptr;
-    TESTBENCH_LOG(ERROR, "statistics collector is not inited", K(ret));
+    ret = OB_ERR_UNEXPECTED;
+    TESTBENCH_LOG(ERROR, "statistics task is null", K(ret));
   } else {
     ObStatisticsTaskType task_type = task_to_handle->get_type();
     if (ObStatisticsTaskType::STATISTICS_QUEUE_TASK == task_type) {

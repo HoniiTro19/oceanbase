@@ -14,7 +14,7 @@
 #define _OCEANBASE_TESTBENCH_TRANSACTION_EXECUTOR_POOL_H_
 
 #include "lib/thread/thread_mgr_interface.h"
-#include "ob_testbench_transaction_task.h"
+#include "testbench/ob_testbench_transaction_task.h"
 
 namespace oceanbase {
 namespace testbench {
@@ -31,12 +31,17 @@ public:
   int wait();
   void destroy();
   virtual void handle(void *task) override;
+  int push_task(ObIWorkloadTransactionTask *task);
   inline int get_tg_id() const { return tg_id_; }
+  void inc_success_task();
+  void inc_failure_task();
 
 private:
   int tg_id_;
   bool is_inited_;
   ObTestbenchMySQLProxy *sql_proxy_;
+  int64_t success_task_;
+  int64_t failure_task_;
 
 private:
   DISALLOW_COPY_AND_ASSIGN(ObTestbenchTransactionExecutorPool);

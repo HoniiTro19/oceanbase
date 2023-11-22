@@ -36,10 +36,10 @@ namespace oceanbase
       int64_t connections;
       ObTestbenchStatisticsCollector *collector;
       uint64_t dblink_id;
-      ObMySQLConnectionPool *connection_pool;
+      ObTestbenchMySQLProxy *mysql_proxy;
       Parameters partition_id;
       int64_t row_id_start;
-      TO_STRING_KV(K(table_name), K(connections), KP(collector), K(dblink_id), KP(connection_pool), K(partition_id), K(row_id_start));
+      TO_STRING_KV(K(table_name), K(connections), KP(collector), K(dblink_id), KP(mysql_proxy), K(partition_id), K(row_id_start));
     };
 
     class ObIWorkloadTransactionTask
@@ -50,19 +50,19 @@ namespace oceanbase
       virtual WorkloadType get_type() = 0;
       virtual int init();
       virtual int execute_transactions() = 0;
+      virtual int release_dblinks() = 0;
 
     protected:
       virtual int prepare_arrays();
       virtual int wait_for_connection(ObMySQLConnection *conn);
       virtual int record_latency(ObLatencyTaskType type, int64_t latency);
       virtual int wait_and_bind_param(int64_t conn_idx, int64_t &partition_id, int64_t &row_id, ObMySQLPreparedStatement &stmt);
-      virtual int release_dblinks();
 
     protected:
       const char *table_name_;
       int64_t connection_count_;
       Connections connections_;
-      ObMySQLConnectionPool *connection_pool_;
+      ObTestbenchMySQLProxy *mysql_proxy_;
       ObTestbenchStatisticsCollector *latency_collector_;
       uint64_t dblink_id_;
       Parameters partition_id_;
@@ -73,7 +73,7 @@ namespace oceanbase
       int64_t success_;
       int64_t failure_;
       ObArenaAllocator allocator_;
-      VIRTUAL_TO_STRING_KV(K(table_name_), K(connection_count_), K(dblink_id_), K(partition_id_), K(row_id_start_), K(latencys_), K(cumulative_latencys_), K(commits_), K(success_), K(failure_));
+      VIRTUAL_TO_STRING_KV(K_(table_name), K_(connection_count), K_(dblink_id), K_(partition_id), K_(row_id_start), K_(latencys), K_(cumulative_latencys), K_(commits), K_(success), K_(failure));
     };
 
     class ObDistributedTransactionTask : public ObIWorkloadTransactionTask

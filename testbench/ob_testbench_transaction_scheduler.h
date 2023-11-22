@@ -15,14 +15,14 @@
 
 namespace oceanbase
 {
-  namespace testbench
-  {
-    class ObTestbenchTransactionScheduler
-    {
-    public:
-      ObTestbenchTransactionScheduler();
-      ~ObTestbenchTransactionScheduler();
-    };
-  }
-}
+namespace testbench
+{
+class ObTestbenchTransactionScheduler
+{
+public:
+  ObTestbenchTransactionScheduler();
+  ~ObTestbenchTransactionScheduler();
+};
+} // namespace testbench
+} // namesapce oceanbase
 #endif

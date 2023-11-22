@@ -18,37 +18,39 @@
 
 namespace oceanbase
 {
-  namespace testbench
+namespace testbench
+{
+  using namespace common::sqlclient;
+  /*
+    ObTestbenchMySQLProxy uses a single thread timer task (ObMySQLConnectionPool) to refreash connections with each server-tenant.
+    ObTestbenchMySQLProxy uses ObTestbenchSystableHelper to query the metadata of the database.
+  */
+  class ObTestbenchMySQLProxy
   {
-    using namespace common::sqlclient;
-    /*
-      ObTestbenchMySQLProxy uses a single thread timer task (ObMySQLConnectionPool) to refreash connections with each server-tenant.
-      ObTestbenchMySQLProxy uses ObTestbenchSystableHelper to query the metadata of the database.
-    */
-    class ObTestbenchMySQLProxy
-    {
-    public:
-      ObTestbenchMySQLProxy();
-      ~ObTestbenchMySQLProxy();
-      int stop_and_destroy();
-      void set_db_param(const common::ObAddr &addr, const char *cluster_user, const char *cluster_pass, const char *cluster_db);
-      int init();
-      int start_service();
-      int get_mysql_conn(int64_t dblink_id, uint32_t session_id, ObMySQLConnection *&mysql_conn);
-      int release_conn(uint32_t session_id, bool success, ObISQLConnection *conn);
+  public:
+    ObTestbenchMySQLProxy();
+    ~ObTestbenchMySQLProxy();
+    int stop_and_destroy();
+    int set_server_provider_param(const common::ObAddr &addr);
+    int set_connection_pool_param(const char *user, const char *pass, const char *db);
+    int init();
+    int start_service();
+    int get_mysql_conn(int64_t dblink_id, uint32_t session_id, ObMySQLConnection *&mysql_conn);
+    int release_conn(uint32_t session_id, bool success, ObISQLConnection *conn);
+    ObTestbenchServerProvider *get_server_provider();
 
-    private:
-      bool is_inited_;
-      int tg_id_;
-      ObTestbenchServerProvider svr_provider_;
-      ObMySQLConnectionPool sql_conn_pool_;
-      ObTestbenchSystableHelper systable_helper_;
-      ObConnPoolConfigParam conn_pool_config_;
-      libobcdc::MySQLConnConfig mysql_config_;
+  private:
+    bool is_inited_;
+    int tg_id_;
+    ObTestbenchServerProvider svr_provider_;
+    ObMySQLConnectionPool sql_conn_pool_;
+    ObTestbenchSystableHelper systable_helper_;
+    ObConnPoolConfigParam conn_pool_config_;
+    libobcdc::MySQLConnConfig mysql_config_;
 
-    private:
-      DISALLOW_COPY_AND_ASSIGN(ObTestbenchMySQLProxy);
-    };
-  }
-}
+  private:
+    DISALLOW_COPY_AND_ASSIGN(ObTestbenchMySQLProxy);
+  };
+} // namespace testbench
+} // namespace oceanbase
 #endif

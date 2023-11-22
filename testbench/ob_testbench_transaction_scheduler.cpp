@@ -14,8 +14,8 @@
 
 namespace oceanbase
 {
-  namespace testbench
-  {
+namespace testbench
+{
 
-  }
-}
+} // testbench
+} // oceanbase
