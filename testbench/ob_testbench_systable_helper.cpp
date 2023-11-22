@@ -47,9 +47,10 @@ int ObTestbenchSystableHelper::do_query_(libobcdc::MySQLQueryBase &query) {
     TESTBENCH_LOG(ERROR, "ObTestbenchSystableHelper mysql_conn_ not init",
                   KR(ret));
   } else if (OB_FAIL(mysql_conn_.query(query))) {
-    TESTBENCH_LOG(ERROR, "ObTestbenchSystableHelper mysql_conn_ query fail",
-                  KR(ret), K(query.get_server()), K(query.get_mysql_err_code()),
-                  K(query.get_mysql_err_msg()));
+    TESTBENCH_LOG(ERROR, "ObTestbenchSystableHelper mysql_conn_ query fail", KR(ret), 
+                  "server", query.get_server(),
+                  "mysql_err_code", query.get_mysql_err_code(),
+                  "mysql_err_msg", query.get_mysql_err_msg());
   }
   return ret;
 }
@@ -465,6 +466,50 @@ int ObTestbenchSystableHelper::query_tenant_status(
                 K(tenant_status));
 
   return ret;
+}
+
+int ObTestbenchSystableHelper::query_partition_info(const char *database_name, const char *table_name, PartitionInfo &partition_location) 
+{
+  int ret = OB_SUCCESS;
+  BatchSQLQuery query;
+  libobcdc::QueryPartitionInfoStrategy query_partition_info_strategy(database_name, table_name);
+  partition_location.clear();
+  if (IS_NOT_INIT) {
+    ret = OB_NOT_INIT;
+    TESTBENCH_LOG(ERROR, "systable_helper not init", KR(ret));
+  } else if (OB_FAIL(query.init(&query_partition_info_strategy))) {
+    TESTBENCH_LOG(ERROR, "init partition_location list failed", KR(ret), KCSTRING(database_name), KCSTRING(table_name));
+  } else if (OB_FAIL(do_query_(query))) {
+    if (OB_NEED_RETRY == ret) {
+      TESTBENCH_LOG(WARN, "do query_partition_info fail, need retry",
+              KR(ret), KCSTRING(database_name), KCSTRING(table_name), 
+              "mysql_error_code", query.get_mysql_err_code(), 
+              "mysql_error_msg", query.get_mysql_err_msg());
+    } else {
+      TESTBENCH_LOG(ERROR, "do query_partition_info fail", KR(ret),
+                    KCSTRING(database_name), KCSTRING(table_name), 
+                    "mysql_error_code", query.get_mysql_err_code(), "mysql_error_msg", query.get_mysql_err_msg());
+    }
+  } else if (OB_FAIL(query.get_records(partition_location))) {
+    if (OB_NEED_RETRY == ret) {
+      TESTBENCH_LOG(
+          WARN, "get_records fail while query_partition_info, need retry",
+          KR(ret), KCSTRING(database_name), KCSTRING(table_name),
+          "mysql_error_code", query.get_mysql_err_code(),
+          "mysql_error_msg", query.get_mysql_err_msg());
+    } else {
+      TESTBENCH_LOG(ERROR, "get_records fail while query_partition_info",
+                  KR(ret), KCSTRING(database_name), KCSTRING(table_name),
+                  "mysql_error_code", query.get_mysql_err_code(), "mysql_error_msg", query.get_mysql_err_msg());
+    }
+  }
+  TESTBENCH_LOG(DEBUG, "query_partition_info", KR(ret), KCSTRING(database_name), KCSTRING(table_name));
+  return ret;
+}
+
+bool ObTestbenchSystableHelper::is_not_inited() 
+{
+  return !is_inited_;
 }
 } // namespace testbench
 } // namespace oceanbase

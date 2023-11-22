@@ -24,9 +24,10 @@
 #include "share/ob_zone_info.h"                           // ObZoneStorageTyp
 #include "common/ob_zone_type.h"                          // ObZoneType
 #include "share/ob_server_status.h"                       // ObServerStatus
-
+#include "lib/hash/ob_link_hashmap.h"
 
 #include "ob_log_mysql_connector.h"                       // MySQLQueryBase
+#include "lib/allocator/ob_pooled_allocator.h"
 
 namespace oceanbase
 {
@@ -170,6 +171,20 @@ private:
   DISALLOW_COPY_AND_ASSIGN(QueryTenantStatusStrategy);
 };
 
+////////////////////////// QueryPartitionInfoStrategy /////////////////////////
+class QueryPartitionInfoStrategy : public ISQLStrategy {
+public:
+  QueryPartitionInfoStrategy(const char *database_name, const char *table_name) : database_name_(database_name), table_name_(table_name){}
+  ~QueryPartitionInfoStrategy() {}
+public:
+  int build_sql_statement(char *sql_buf, const int64_t mul_statement_buf_len, int64_t &pos);
+private:
+  const char *database_name_;
+  const char *table_name_;
+private:
+  DISALLOW_COPY_AND_ASSIGN(QueryPartitionInfoStrategy);
+};
+
 /////////////////////////////////// IObLogSysTableHelper ///////////////////////////////////////
 // query system table
 class ObLogSvrBlacklist;
@@ -189,6 +204,9 @@ public:
   struct ObServerTZInfoVersionInfo;
 
   typedef common::ObSEArray<share::ObLSID, DEFAULT_RECORDS_NUM> TenantLSIDs;
+
+  typedef common::ObArray<int64_t> PartitionList;
+  typedef common::hash::ObHashMap<ObString, PartitionList*> PartitionInfo;
 
 public:
   virtual ~IObLogSysTableHelper() { }
@@ -327,6 +345,8 @@ public:
      */
     int get_records(share::schema::TenantStatus &record);
 
+    int get_records(PartitionInfo &partition_location);
+
     int64_t get_batch_sql_count() const { return batch_sql_count_; }
 
   private:
@@ -342,6 +362,7 @@ public:
     int parse_record_from_row_(common::ObIArray<TenantInfo> &records);
     int parse_record_from_row_(common::ObIArray<common::ObAddr> &records);
     int parse_record_from_row_(share::schema::TenantStatus &records);
+    int parse_record_from_row_(PartitionInfo &records);
 
   private:
     bool        inited_;
@@ -357,6 +378,7 @@ public:
     int64_t     pos_;                          // Record current fill position
     int64_t     batch_sql_count_;              // Number of records aggregated SQL
 
+    common::ObPooledAllocator<PartitionList> partition_list_allocator_;
   private:
     DISALLOW_COPY_AND_ASSIGN(BatchSQLQuery);
   };

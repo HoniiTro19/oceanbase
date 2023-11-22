@@ -7,6 +7,8 @@ set(OB_TESTBENCH_CORE
   ob_testbench_systable_helper.cpp
   ob_testbench_transaction_task.cpp
   ob_testbench_statistics_collector.cpp
+  ob_testbench_options.cpp
+  ob_testbench_location_cache.cpp
 )
 add_library(ob_testbench_workload ${OB_TESTBENCH_CORE})
 target_link_libraries(ob_testbench_workload PUBLIC obcdc)

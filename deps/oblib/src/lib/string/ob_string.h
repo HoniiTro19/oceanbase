@@ -670,6 +670,34 @@ public:
     return ret;
   }
 
+  inline int get_numeric(int64_t &numeric) const
+  {
+    int ret = OB_SUCCESS;
+    bool negative = false;
+    numeric = 0;
+    if (OB_ISNULL(ptr_) || data_length_ == 0) {
+      ret = OB_INVALID_DATA;
+    } else {
+      int i = 0;
+      if (data_length_ >= 2 && ptr_[0] == '-') {
+        i += 1;
+        negative = true;
+      }
+      for(; i < data_length_; ++i) {
+        if (!isdigit(ptr_[i])) {
+          ret = OB_INVALID_DATA;
+          break;
+        }
+        numeric *= 10;
+        numeric += ptr_[i] - '0';
+      }
+    }
+    if (negative) {
+      numeric *= -1;
+    }
+    return ret;
+  }
+
   friend std::ostream &operator<<(std::ostream &os, const ObString &str);  // for google test
 
   static uint32_t buffer_size_offset_bits() { return offsetof(ObString, buffer_size_) * 8; }

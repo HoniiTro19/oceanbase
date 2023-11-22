@@ -236,13 +236,35 @@ int QueryTenantStatusStrategy::build_sql_statement(
   return ret;
 }
 
+///////////////////////// QueryPartitionInfoStrategy ///////////////////////////
+int QueryPartitionInfoStrategy::build_sql_statement(
+    char *sql_buf,
+    const int64_t mul_statement_buf_len,
+    int64_t &pos)
+{
+  int ret = OB_SUCCESS;
+  pos = 0;
+  
+  if (OB_ISNULL(sql_buf) || OB_UNLIKELY(mul_statement_buf_len <= 0)) {
+    ret = OB_INVALID_ARGUMENT;
+    LOG_ERROR("invalid argument", KR(ret), K(sql_buf), K(mul_statement_buf_len));
+  } else if (OB_FAIL(databuff_printf(sql_buf, mul_statement_buf_len, pos, 
+    "SELECT SVR_IP, PARTITION_NAME FROM CDB_OB_TABLE_LOCATIONS WHERE DATABASE_NAME = '%s' AND TABLE_NAME = '%s' AND ROLE = 'LEADER'",
+      database_name_, table_name_))) {
+    LOG_ERROR("build_sql_statement failed for query partition_info", KR(ret), K(pos), KCSTRING(sql_buf));
+  }
+  
+  return ret;
+}
+
 IObLogSysTableHelper::BatchSQLQuery::BatchSQLQuery() :
     inited_(false),
     enable_multiple_statement_(false),
     mul_statement_buf_(NULL),
     mul_statement_buf_len_(0),
     pos_(0),
-    batch_sql_count_(0)
+    batch_sql_count_(0),
+    partition_list_allocator_()
 {
   single_statement_buf_[0] = '\0';
 }
@@ -326,6 +348,7 @@ void IObLogSysTableHelper::BatchSQLQuery::destroy()
 
   pos_ = 0;
   batch_sql_count_ = 0;
+  partition_list_allocator_.reset();
 }
 
 void IObLogSysTableHelper::BatchSQLQuery::reset()
@@ -426,7 +449,7 @@ int IObLogSysTableHelper::BatchSQLQuery::get_records_tpl_(RecordsType &records, 
         record_count++;
       }
     } // while
-
+    LOG_DEBUG("IObLogSysTableHelper::BatchSQLQuery::get_records_tpl_", KR(ret), K(record_count));
     if (OB_ITER_END == ret) {
       ret = OB_SUCCESS;
     }
@@ -670,6 +693,63 @@ int IObLogSysTableHelper::BatchSQLQuery::get_records(share::schema::TenantStatus
   if (OB_UNLIKELY(0 == record_count)) {
     records = share::schema::TenantStatus::TENANT_NOT_CREATE;
   }
+  return ret;
+}
+
+int IObLogSysTableHelper::BatchSQLQuery::get_records(PartitionInfo &records)
+{
+  int ret = OB_SUCCESS;
+  int64_t record_count = 0;
+  if (OB_FAIL(get_records_tpl_(records, "QueryPartitionInfo", record_count))) {
+    LOG_ERROR("get partition info failed", KR(ret));
+  } else if (OB_UNLIKELY(0 == record_count)) {
+    ret = OB_INVALID_DATA;
+    LOG_ERROR("get empty partition info", KR(ret));
+  }
+  LOG_DEBUG("get partition info records", K(record_count));
+  return ret;
+}
+
+int IObLogSysTableHelper::BatchSQLQuery::parse_record_from_row_(PartitionInfo &records) 
+{
+  int ret = OB_SUCCESS;
+  int64_t index = -1;
+  ObString svr_ip;
+  ObString partition_name;
+  int64_t partition_id = -1;
+  PartitionList *partition_ids = nullptr;
+  index++;
+  GET_DATA(varchar, index, svr_ip, "SVR_IP");
+  index++;
+  GET_DATA(varchar, index, partition_name, "PARTITION_NAME");
+  ObString partition_name_prefix = partition_name.split_on('p');
+  if (OB_FAIL(partition_name.get_numeric(partition_id))) {
+    LOG_ERROR("get partition id failed", KR(ret));
+  } else if (OB_FAIL(records.get_refactored(svr_ip, partition_ids))) {
+    if (OB_HASH_NOT_EXIST == ret) {
+      if (OB_ISNULL(partition_ids = partition_list_allocator_.alloc())) {
+        ret = OB_ALLOCATE_MEMORY_FAILED;
+        LOG_ERROR("alloc memoryfor partition list failed", KR(ret));
+      } else if (OB_FAIL(partition_ids->push_back(partition_id))) {
+        LOG_ERROR("push partition id failed", KR(ret));
+      } else if (OB_FAIL(records.set_refactored(svr_ip, partition_ids))) {
+        LOG_ERROR("create partition_ids failed");
+      }
+    } else {
+      LOG_ERROR("get partition ids by server ip failed", KR(ret));
+    }
+  } else if (OB_ISNULL(partition_ids)) {
+    ret = OB_ERR_UNEXPECTED;
+    LOG_ERROR("get empty partition id list", KR(ret));
+  } else if (OB_FAIL(partition_ids->push_back(partition_id))) {
+    LOG_ERROR("push partition id failed", KR(ret));
+  }
+  
+  if (OB_SUCCESS != ret && nullptr != partition_ids) {
+    partition_list_allocator_.free(partition_ids);
+    partition_ids = nullptr;
+  }
+  LOG_DEBUG("parse record from row", KR(ret), K(svr_ip), K(partition_name), K(partition_id));
   return ret;
 }
 

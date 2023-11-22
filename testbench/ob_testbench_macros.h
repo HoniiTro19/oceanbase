@@ -15,19 +15,42 @@
 
 namespace oceanbase
 {
-  // log printer of instance
+namespace testbench 
+{
+/*
+ *                                      log printer of instance
+ */ 
 #define MPRINT(format, ...) fprintf(stdout, format "\n", ##__VA_ARGS__)
 #define MPRINTx(format, ...)     \
   MPRINT(format, ##__VA_ARGS__); \
   exit(1)
 
-// workload type macros
+/*
+ *                                        workload type macros
+ */ 
 #define WORKLOAD_TYPES                                  \
   X(DISTRIBUTED_TRANSACTION, "distributed_transaction") \
   X(CONTENTION, "contention")                           \
   X(DEADLOCK, "deadlock")
 
-#define ADD_WORKLOAD_OPTS(opts, id, src_opt_str) opts.push_back(OB_NEW(ObWorkloadOptions<WorkloadType::id>, "WorkloadOptions", src_opt_str));
+#define ADD_WORKLOAD_OPTS(opts, id, src_opt_str)                                                    \
+  ({                                                                                                \
+    int ret = OB_SUCCESS;                                                                           \
+    switch (id) {                                                                                   \
+      case DISTRIBUTED_TRANSACTION:                                                                 \
+        opts.push_back(OB_NEW(ObDistributedTransactionOptions, "WorkloadOptions", src_opt_str));    \
+        break;                                                                                      \
+      case CONTENTION:                                                                              \
+        opts.push_back(OB_NEW(ObContentionTransactionOptions, "WorkloadOptions", src_opt_str));     \
+        break;                                                                                      \
+      case DEADLOCK:                                                                                \
+        opts.push_back(OB_NEW(ObDeadlockTransactionOptions, "WorkloadOptions", src_opt_str));       \
+        break;                                                                                      \
+      default:                                                                                      \
+        TESTBENCH_LOG(ERROR, "undefined workload type", K(id));                                     \
+        break;                                                                                      \
+    }                                                                                               \
+  })
 
 #define X(key, value) key,
   enum WorkloadType
@@ -41,30 +64,59 @@ namespace oceanbase
       WORKLOAD_TYPES};
 #undef X
 
+/*
+ *                                        workload options macros
+ */ 
+
 // global workload options macros
 #define GLOBAL_OPTIONS       \
   X(STARTTIME, "start_time") \
   X(DURATION, "duration")
 
 // distributed transaction workload options macros
-#define DTXN_OPTIONS              \
-  GLOBAL_OPTIONS                  \
-  X(PARTICIPANTS, "participants") \
-  X(OPERATIONS, "operations")     \
-  X(AFFECTROWS, "affect_rows")    \
+#define DISTRIBUTED_TXN_OPTIONS              \
+  GLOBAL_OPTIONS                             \
+  X(PARTICIPANTS, "participants")            \
+  X(OPERATIONS, "operations")                \
   X(END, "end")
 
+// contention transaction workload options macros
+#define CONTENTION_TXN_OPTIONS              \
+  GLOBAL_OPTIONS                            \
+  X(CONCURRENCY, "concurrency")             \
+  X(OPERATIONS, "operations")               \
+  X(END, "end")
+
+// deadlock transaction workload options macros
+#define DEADLOCK_TXN_OPTIONS                \
+  GLOBAL_OPTIONS                            \
+  X(CONCURRENCY, "concurrency")             \
+  X(CHAINS, "chains")                       \
+  X(END, "end")  
+
 #define X(key, value) key,
-  enum DTxnOption
+  enum class DistributedTxnOptions
   {
-    DTXN_OPTIONS
+    DISTRIBUTED_TXN_OPTIONS
+  };
+
+  enum class ContentionTxnOptions
+  {
+    CONTENTION_TXN_OPTIONS
+  };
+
+  enum class DeadlockTxnOptions
+  {
+    DEADLOCK_TXN_OPTIONS
   };
 #undef X
 
 #define X(key, value) value,
-  const char *const dtxn_opts[] = {
-      DTXN_OPTIONS};
+  const char *const distributed_txn_opts[] = { DISTRIBUTED_TXN_OPTIONS };
+  const char *const contention_txn_opts[] = { CONTENTION_TXN_OPTIONS };
+  const char *const deadlock_txn_opts[] = { DEADLOCK_TXN_OPTIONS };
 #undef X
-}
+} // namespace testbench
+} // namespace oceanbase
 
 #endif
