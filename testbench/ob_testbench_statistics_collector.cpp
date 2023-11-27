@@ -166,12 +166,9 @@ void ObStatisticsQueueTask::set_histogram_inited() {
 /*
                           ObTestbenchStatisticsCollector
 */
-ObTestbenchStatisticsCollector::ObTestbenchStatisticsCollector(int64_t bucket_capacity, double_t bucket_min_ratio, double_t bucket_max_ratio)
+ObTestbenchStatisticsCollector::ObTestbenchStatisticsCollector()
   : is_inited_(false),
     snapshot_ready_(0),
-    bucket_capacity_(bucket_capacity),
-    bucket_min_ratio_(bucket_min_ratio),
-    bucket_max_ratio_(bucket_max_ratio),
     submit_(),
     submit_queues_{},
     histograms_{},
@@ -180,8 +177,11 @@ ObTestbenchStatisticsCollector::ObTestbenchStatisticsCollector(int64_t bucket_ca
 
 ObTestbenchStatisticsCollector::~ObTestbenchStatisticsCollector() {}
 
-int ObTestbenchStatisticsCollector::init() {
+int ObTestbenchStatisticsCollector::init(int64_t bucket_capacity, double_t bucket_min_ratio, double_t bucket_max_ratio) {
   int ret = OB_SUCCESS;
+  bucket_capacity_ = bucket_capacity;
+  bucket_min_ratio_ = bucket_min_ratio;
+  bucket_max_ratio_ = bucket_max_ratio;
   if (IS_INIT) {
     ret = OB_INIT_TWICE;
     TESTBENCH_LOG(WARN, "statistics collector has already been inited", K(ret));
@@ -200,9 +200,6 @@ int ObTestbenchStatisticsCollector::init() {
   }
   if (OB_SUCC(ret)) {
     is_inited_ = true;
-  } else if (OB_INIT_TWICE != ret) {
-    destroy();
-    TESTBENCH_LOG(ERROR, "statistics collector init failed", K(ret));
   }
   return ret;
 }
@@ -243,6 +240,8 @@ void ObTestbenchStatisticsCollector::wait() {
 }
 
 void ObTestbenchStatisticsCollector::destroy() {
+  stop();
+  wait();
   is_inited_ = false;
   if (-1 != tg_id_) {
     TG_DESTROY(tg_id_);

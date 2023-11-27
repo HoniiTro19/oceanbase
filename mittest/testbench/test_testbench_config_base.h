@@ -13,9 +13,8 @@ public:
   ~TestConfig() {}
 
   virtual void SetUp() {
-    common::ObAddr addr;
     const char *host = "127.0.0.1";
-    const int32_t port = 2881;
+    const int32_t port = 28801;
     addr.set_ip_addr(host, port);
     const int64_t sql_conn_timeout_us = 10L * 1000 * 1000;
     const int64_t sql_query_timeout_us = 10L * 1000 * 1000;
@@ -34,6 +33,7 @@ public:
   virtual void Tear() {}
 
 protected:
+  common::ObAddr addr;
   libobcdc::MySQLConnConfig mysql_config;
   ObConnPoolConfigParam conn_pool_config;
 };

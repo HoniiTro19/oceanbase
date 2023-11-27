@@ -31,7 +31,7 @@ void TestAsyncOperation::SetUp() {
   ASSERT_EQ(OB_SUCCESS, server_provider.init(systable_helper));
   const char *user = "root";
   const char *pass = "";
-  const char *db = "testbench";
+  const char *db = "test";
   ASSERT_EQ(OB_SUCCESS, sql_conn_pool.set_db_param(user, pass, db));
   conn_pool_config.sqlclient_per_observer_conn_limit_ = CONCURRENT_LINKS;
   sql_conn_pool.update_config(conn_pool_config);

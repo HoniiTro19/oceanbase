@@ -33,6 +33,7 @@ enum ObLatencyTaskType {
   COMMIT_SQL_LATENCY_TASK,
   LOCK_SQL_LATENCY_TASK,
   ELECTION_LATENCY_TASK,
+  ROLLBACK_TXN_LATENCY_TASK,
   LATENCY_TASK_TYPE_CNT
 };
 
@@ -122,11 +123,11 @@ private:
 
 class ObTestbenchStatisticsCollector : public lib::TGTaskHandler {
 public:
-  ObTestbenchStatisticsCollector(int64_t bucket_capacity_, double_t bucket_min_ratio, double_t bucket_max_ratio);
+  ObTestbenchStatisticsCollector();
   ~ObTestbenchStatisticsCollector();
 
 public:
-  int init();
+  int init(int64_t bucket_capacity, double_t bucket_min_ratio, double_t bucket_max_ratio);
   int start();
   void stop();
   void wait();

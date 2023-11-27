@@ -70,10 +70,8 @@ namespace oceanbase
       Latencys latencys_;
       Latencys cumulative_latencys_;
       Commits commits_;
-      int64_t success_;
-      int64_t failure_;
       ObArenaAllocator allocator_;
-      VIRTUAL_TO_STRING_KV(K_(table_name), K_(connection_count), K_(dblink_id), K_(partition_id), K_(row_id_start), K_(latencys), K_(cumulative_latencys), K_(commits), K_(success), K_(failure));
+      VIRTUAL_TO_STRING_KV(K_(table_name), K_(connection_count), K_(dblink_id), K_(partition_id), K_(row_id_start), K_(latencys), K_(cumulative_latencys), K_(commits));
     };
 
     class ObDistributedTransactionTask : public ObIWorkloadTransactionTask

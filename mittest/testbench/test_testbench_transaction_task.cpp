@@ -13,7 +13,7 @@ using namespace testbench;
 class TestTransactionTask : public TestConfig {
 public:
   TestTransactionTask() 
-    : mysql_tg_id(-1), statistics_collector(bucket_capacity, bucket_min_ratio, bucket_max_ratio) {}
+    : mysql_tg_id(-1), statistics_collector() {}
   ~TestTransactionTask() {}
 
   virtual void SetUp();
@@ -42,7 +42,7 @@ void TestTransactionTask::SetUp() {
   ASSERT_EQ(OB_SUCCESS, mysql_proxy.set_connection_pool_param(user, pass, db));
   ASSERT_EQ(OB_SUCCESS, mysql_proxy.init());
   ASSERT_EQ(OB_SUCCESS, mysql_proxy.start_service());
-  ASSERT_EQ(OB_SUCCESS, statistics_collector.init());
+  ASSERT_EQ(OB_SUCCESS, statistics_collector.init(bucket_capacity, bucket_min_ratio, bucket_max_ratio));
   ASSERT_EQ(OB_SUCCESS, statistics_collector.start());
   ObTestbenchServerProvider *server_provider = mysql_proxy.get_server_provider();
   ObSEArray<ObFixedLengthString<OB_MAX_TENANT_NAME_LENGTH + 1>, 16>
@@ -63,7 +63,7 @@ void TestTransactionTask::SetUp() {
 }
 
 void TestTransactionTask::Tear() {
-  mysql_proxy.stop_and_destroy();
+  mysql_proxy.destroy();
   statistics_collector.destroy();
 }
 

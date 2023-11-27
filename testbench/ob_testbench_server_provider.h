@@ -49,7 +49,7 @@ class ObTestbenchServerProvider
     : public common::sqlclient::ObMySQLServerProvider {
 public:
   ObTestbenchServerProvider();
-  virtual ~ObTestbenchServerProvider() {}
+  virtual ~ObTestbenchServerProvider();
 
 public:
   virtual int get_server(const int64_t svr_idx,

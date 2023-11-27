@@ -20,7 +20,9 @@ ObTestbenchSystableHelper::ObTestbenchSystableHelper()
 
 ObTestbenchSystableHelper::~ObTestbenchSystableHelper() {}
 
-void ObTestbenchSystableHelper::destroy() {}
+void ObTestbenchSystableHelper::destroy() {
+  mysql_conn_.destroy();
+}
 
 int ObTestbenchSystableHelper::init_conn(const libobcdc::MySQLConnConfig &cfg) {
   int ret = OB_SUCCESS;

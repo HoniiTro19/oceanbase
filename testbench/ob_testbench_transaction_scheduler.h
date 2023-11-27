@@ -13,15 +13,50 @@
 #ifndef _OCEANBASE_TESTBENCH_TRANSACTION_SCHEDULER_H_
 #define _OCEANBASE_TESTBENCH_TRANSACTION_SCHEDULER_H_
 
+#include "testbench/ob_testbench_mysql_proxy.h"
+#include "testbench/ob_testbench_location_cache.h"
+#include "testbench/ob_testbench_transaction_executor_pool.h"
+#include "testbench/ob_testbench_statistics_collector.h"
+
 namespace oceanbase
 {
 namespace testbench
 {
-class ObTestbenchTransactionScheduler
+class ObTestbenchTransactionScheduler : public lib::TGRunnable
 {
 public:
   ObTestbenchTransactionScheduler();
   ~ObTestbenchTransactionScheduler();
+  
+  int init(ObTestbenchMySQLProxy *mysql_proxy, ObTestbenchTransactionExecutorPool *executor_pool, ObTestbenchStatisticsCollector *statistics_collector, ObIWorkloadOptions *workload_options, ObDatasetOptions *dataset_options, ObConnectionOptions *connection_options);
+  int start();
+  void stop();
+  void wait();
+  void destroy();
+  virtual void run1() override;
+  void generate_distributed_txn_task();
+  void generate_contention_txn_task();
+  void generate_deadlock_txn_task();
+
+private:
+  int get_dblink_ids();
+
+private:
+  int tg_id_;
+  bool is_inited_;
+  WorkloadType txn_type_;
+  int64_t cur_partition_id_;
+  int64_t cur_row_id_;
+  int64_t cur_conn_id_;
+  const char *table_name_;
+  ObTestbenchMySQLProxy *mysql_proxy_;
+  ObTestbenchLocationCache location_cache_;
+  ObTestbenchTransactionExecutorPool *executor_pool_;
+  ObTestbenchStatisticsCollector *statistics_collector_;
+  ObIWorkloadOptions *workload_options_;
+  ObDatasetOptions *dataset_options_;
+  common::ObArray<uint64_t> dblink_ids_;
+  ObArenaAllocator allocator_;
 };
 } // namespace testbench
 } // namesapce oceanbase

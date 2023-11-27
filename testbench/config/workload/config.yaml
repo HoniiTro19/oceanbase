@@ -1,14 +1,29 @@
+# empty password should not exist in the config file
 instance_testbench:
   global:
-    cluster_host: 127.0.0.1
-    cluster_port: 2881
-    cluster_user: root
-    cluster_password:  
-    cluster_db_name: oceanbase
-    duration: 1
-  distributed_transaction:
-    participants: 10
-    operations: 1
-    affect_rows: 1
-    start_time: 0
-    duration: 5
+    # common parameters
+    home_path: ~/scheduler
+    log_level: INFO
+    time: 1
+  statistics:
+    # for statistics collector
+    capacity: 500
+    minimum: 10
+    maximum: 80
+  connection:
+    # for connection parameters
+    host: 127.0.0.1
+    port: 28801
+    user: root
+    # password:  
+    database: test
+    table: testbench
+  dataset:
+    # for dataset parameteres
+    partitions: 9
+    rows: 3000
+  distributed:
+    threads: 10
+    tasks: 99999
+    participants: 1
+    operations: 10

@@ -27,8 +27,6 @@ ObIWorkloadTransactionTask::ObIWorkloadTransactionTask(BasicTaskConfig config)
   dblink_id_(config.dblink_id),
   partition_id_(config.partition_id),
   row_id_start_(config.row_id_start),
-  success_(0),
-  failure_(0),
   allocator_("TxnTask")
 {}
 
@@ -150,11 +148,10 @@ int ObDistributedTransactionTask::init() {
     TESTBENCH_LOG(ERROR, "get format lock_txn_sql failed", K(ret), K(lock_txn_sql_));
   } else {
     for (int64_t i = 0; i < connection_count_; ++i) {
-      if (OB_FAIL(connections_.at(i)->prepare_statement(lock_txn_stmts_.at(i), lock_txn_sql_.ptr()))) {
-        TESTBENCH_LOG(ERROR, "prepare statement failed", K(ret));
+      if (OB_SUCC(ret) && OB_FAIL(connections_.at(i)->prepare_statement(lock_txn_stmts_.at(i), lock_txn_sql_.ptr()))) {
+        TESTBENCH_LOG(ERROR, "prepare statement failed", KR(ret), "sql", lock_txn_sql_.ptr());
       }
     }
-    TESTBENCH_LOG(DEBUG, "distributed transaction task init succeed", K(participants_), K(operations_), K(lock_txn_sql_));
   }
   return ret;
 }
@@ -208,18 +205,19 @@ int ObDistributedTransactionTask::execute_transactions() {
     if (OB_FAIL(wait_for_connection(connections_.at(conn_idx)))) {
       TESTBENCH_LOG(WARN, "wait for the connection get error", K(ret));
       commits_.at(conn_idx) = false;
-    } else if (OB_UNLIKELY(false == commits_.at(conn_idx))) {
-      failure_ += 1;
     } else {
       latencys_.at(conn_idx) = common::ObTimeUtility::current_time() - latencys_.at(conn_idx);
       cumulative_latencys_.at(conn_idx) = common::ObTimeUtility::current_time() - cumulative_latencys_.at(conn_idx);
-      if (OB_FAIL(record_latency(ObLatencyTaskType::COMMIT_SQL_LATENCY_TASK, latencys_.at(conn_idx)))) {
-        TESTBENCH_LOG(WARN, "record the latency of commit sql failed", K(ret));
-      } else if (OB_FAIL(record_latency(ObLatencyTaskType::DISTRIBUTED_TXN_LATENCY_TASK, latencys_.at(conn_idx)))) {
-        TESTBENCH_LOG(WARN, "record the latency of distributed transaction failed", K(ret));
+      if (OB_UNLIKELY(false == commits_.at(conn_idx))) {
+        if (OB_FAIL(record_latency(ObLatencyTaskType::ROLLBACK_TXN_LATENCY_TASK, cumulative_latencys_.at(conn_idx)))) {
+          TESTBENCH_LOG(WARN, "record the latency of rollback transaction failed", KR(ret), "txn_latency", cumulative_latencys_.at(conn_idx));          
+        }
+      } else if (OB_FAIL(record_latency(ObLatencyTaskType::COMMIT_SQL_LATENCY_TASK, latencys_.at(conn_idx)))) {
+        TESTBENCH_LOG(WARN, "record the latency of commit sql failed", KR(ret), "commit_latency", latencys_.at(conn_idx));
+      } else if (OB_FAIL(record_latency(ObLatencyTaskType::DISTRIBUTED_TXN_LATENCY_TASK, cumulative_latencys_.at(conn_idx)))) {
+        TESTBENCH_LOG(WARN, "record the latency of distributed transaction failed", KR(ret), "txn_latency", cumulative_latencys_.at(conn_idx));
       } else {
-        success_ += 1;
-        TESTBENCH_LOG(DEBUG, "distributed transaction commit success", "commit_latency", latencys_.at(conn_idx));
+        TESTBENCH_LOG(DEBUG, "distributed transaction commit success", "commit_latency", latencys_.at(conn_idx), "txn_latency", cumulative_latencys_.at(conn_idx));
       }
     }
   }
@@ -251,11 +249,10 @@ int ObContentionTransactionTask::init() {
     TESTBENCH_LOG(ERROR, "get format lock_elr_sql_ failed", K(ret), K(lock_elr_sql_));
   } else {
     for (int64_t i = 0; i < connection_count_; ++i) {
-      if (OB_FAIL(connections_.at(i)->prepare_statement(lock_elr_stmts_.at(i), lock_elr_sql_.ptr()))) {
-        TESTBENCH_LOG(ERROR, "prepare statement failed", K(ret));
+      if (OB_SUCC(ret) && OB_FAIL(connections_.at(i)->prepare_statement(lock_elr_stmts_.at(i), lock_elr_sql_.ptr()))) {
+        TESTBENCH_LOG(ERROR, "prepare statement failed", KR(ret), "sql", lock_elr_sql_.ptr());
       }
     }
-    TESTBENCH_LOG(DEBUG, "contention transaction task init succeed", K(aborts_), K(operations_), K(lock_elr_sql_));
   }
   return ret;
 }
@@ -325,17 +322,18 @@ int ObContentionTransactionTask::execute_transactions() {
     if (OB_FAIL(wait_for_connection(connections_.at(conn_idx)))) {
       TESTBENCH_LOG(WARN, "wait for the connection get error", K(ret));
       commits_.at(conn_idx) = false;
-    } else if (OB_UNLIKELY(false == commits_.at(conn_idx))) {
-      failure_ += 1;
     } else {
       cumulative_latencys_.at(conn_idx) = common::ObTimeUtility::current_time() - cumulative_latencys_.at(conn_idx);
-      if (OB_FAIL(record_latency(ObLatencyTaskType::LOCK_SQL_LATENCY_TASK, latencys_.at(conn_idx)))) {
-        TESTBENCH_LOG(WARN, "record the latency of commit sql failed", K(ret));
+      if (OB_UNLIKELY(false == commits_.at(conn_idx))) {
+        if (OB_FAIL(record_latency(ObLatencyTaskType::ROLLBACK_TXN_LATENCY_TASK, cumulative_latencys_.at(conn_idx)))) {
+          TESTBENCH_LOG(WARN, "record the latency of rollback transaction failed", KR(ret), "txn_latency", cumulative_latencys_.at(conn_idx));
+        }
+      } else if (OB_FAIL(record_latency(ObLatencyTaskType::LOCK_SQL_LATENCY_TASK, latencys_.at(conn_idx)))) {
+        TESTBENCH_LOG(WARN, "record the latency of commit sql failed", KR(ret), "lock_latency", latencys_.at(conn_idx));
       } else if (OB_FAIL(record_latency(ObLatencyTaskType::CONTENTION_TXN_LATENCY_TASK, latencys_.at(conn_idx)))) {
-        TESTBENCH_LOG(WARN, "record the latency of contention transaction failed", K(ret));
+        TESTBENCH_LOG(WARN, "record the latency of contention transaction failed", KR(ret), "txn_latency", cumulative_latencys_.at(conn_idx));
       } else {
-        success_ += 1;
-        TESTBENCH_LOG(DEBUG, "contention transaction commit success", K(latencys_.at(conn_idx)));
+        TESTBENCH_LOG(DEBUG, "contention transaction commit success", "lock_latency", latencys_.at(conn_idx), "txn_latency", cumulative_latencys_.at(conn_idx));
       }
     }
   }
@@ -379,10 +377,10 @@ int ObDeadlockTransactionTask::init() {
     TESTBENCH_LOG(ERROR, "get format lock_lcl_sql_ failed", K(ret), K(lock_lcl_sql_));
   } else {
     for (int64_t i = 0; i < connection_count_; ++i) {
-      connections_.at(i)->prepare_statement(lock_lcl_stmts_.at(i), lock_lcl_sql_.ptr());
-      TESTBENCH_LOG(ERROR, "prepare statement failed", K(ret));
+      if (OB_SUCC(ret) && OB_FAIL(connections_.at(i)->prepare_statement(lock_lcl_stmts_.at(i), lock_lcl_sql_.ptr()))) {
+        TESTBENCH_LOG(ERROR, "prepare statement failed", KR(ret), "sql", lock_lcl_sql_.ptr());
+      }
     }
-    TESTBENCH_LOG(DEBUG, "deadlock transaction task init succeed", K(chains_), K(lock_lcl_sql_));
   }
   return ret;
 }

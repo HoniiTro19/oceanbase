@@ -25,17 +25,16 @@ ObTestbenchServerProvider::ObTestbenchServerProvider()
                    OB_MALLOC_NORMAL_BLOCK_SIZE),
       tenant_server_map_(), systable_helper_(NULL), refresh_server_lock_() {}
 
+ObTestbenchServerProvider::~ObTestbenchServerProvider() {}
+
 int ObTestbenchServerProvider::init(
     ObTestbenchSystableHelper &systable_helper) {
   int ret = OB_SUCCESS;
   if (IS_INIT) {
     ret = OB_INIT_TWICE;
     TESTBENCH_LOG(WARN, "ObTestbenchServerProvider init twice", KR(ret));
-  } else if (OB_FAIL(
-                 tenant_server_map_.init(ObModIds::OB_SQL_CONNECTION_POOL))) {
-    TESTBENCH_LOG(ERROR,
-                  "ObTestbenchServerProvider tenant_server_map_ init fail",
-                  KR(ret));
+  } else if (OB_FAIL(tenant_server_map_.init(ObModIds::OB_SQL_CONNECTION_POOL))) {
+    TESTBENCH_LOG(ERROR, "ObTestbenchServerProvider tenant_server_map_ init fail", KR(ret));
   } else {
     is_inited_ = true;
     systable_helper_ = &systable_helper;
@@ -238,12 +237,9 @@ int ObTestbenchServerProvider::get_tenant_ids(
     ret = OB_NOT_INIT;
     TESTBENCH_LOG(ERROR, "ObTestbenchServerProvider not inited", K(ret));
   } else if (OB_FAIL(tenant_ids.assign(tenant_list_))) {
-    TESTBENCH_LOG(ERROR, "assign tenant_ids fail", K(ret), K(tenant_ids));
+    TESTBENCH_LOG(ERROR, "assign tenant_ids fail", K(ret), K(tenant_ids), K_(tenant_list));
   } else {
-    for (int i = 0; i < tenant_ids.count(); i++) {
-      const uint64_t &tenant_id = tenant_list_.at(i);
-      TESTBENCH_LOG(INFO, "get_tenants", K(tenant_id));
-    }
+    TESTBENCH_LOG(DEBUG, "get tenant ids from ObTestbenchServerProvider", K(tenant_ids), K_(tenant_list));
   }
   return ret;
 }
@@ -257,7 +253,9 @@ int ObTestbenchServerProvider::get_tenants(
     TESTBENCH_LOG(ERROR, "ObTestbenchServerProvider not inited", K(ret));
   } else if (OB_FAIL(tenants.assign(tenant_name_list_))) {
     TESTBENCH_LOG(ERROR, "assign tenants fail", K(ret), K(tenants),
-                  K(tenant_name_list_));
+                  K_(tenant_name_list));
+  } else {
+    TESTBENCH_LOG(DEBUG, "get tenants from ObTestbenchServerProvider", K(tenants), K_(tenant_name_list));
   }
   return ret;
 }

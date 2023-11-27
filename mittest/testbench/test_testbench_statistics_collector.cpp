@@ -11,7 +11,7 @@ using namespace testbench;
 class TestStatisticsCollector : public ::testing::Test {
 public:
   TestStatisticsCollector() 
-  : statistics_collector(bucket_capacity, bucket_min_ratio, bucket_max_ratio),
+  : statistics_collector(),
     random(),
     allocator("StatCollector")
   {}
@@ -31,7 +31,7 @@ public:
 };
 
 void TestStatisticsCollector::SetUp() {
-  ASSERT_EQ(OB_SUCCESS, statistics_collector.init());
+  ASSERT_EQ(OB_SUCCESS, statistics_collector.init(bucket_capacity, bucket_min_ratio, bucket_max_ratio));
   ASSERT_EQ(OB_SUCCESS, statistics_collector.start());
 }
 

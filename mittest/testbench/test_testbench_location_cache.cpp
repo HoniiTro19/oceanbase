@@ -28,7 +28,6 @@ void TestTestbenchLocationCache::SetUp() {
 
 void TestTestbenchLocationCache::Tear() {
   systable_helper.destroy();
-  location_cache.destroy();
 }
 
 TEST_F(TestTestbenchLocationCache, generate_partitions) {

@@ -34,6 +34,7 @@ public:
   inline int get_svr_count() { return svr_ips_.count(); }
 
 private:
+  bool is_inited_;
   const char *database_name_;
   const char *table_name_;
   ObTestbenchSystableHelper *systable_helper_;

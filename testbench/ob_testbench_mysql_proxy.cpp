@@ -29,20 +29,31 @@ ObTestbenchMySQLProxy::ObTestbenchMySQLProxy() : is_inited_(false),
 
 ObTestbenchMySQLProxy::~ObTestbenchMySQLProxy() {}
 
-int ObTestbenchMySQLProxy::stop_and_destroy() {
-  int ret = OB_SUCCESS;
-  if (IS_NOT_INIT) {
-    ret = OB_NOT_INIT;
-    TESTBENCH_LOG(WARN, "ObTestbenchMySQLProxy not init", KR(ret));
-  } else {
-    sql_conn_pool_.stop();
-    sql_conn_pool_.close_all_connection();
-    TG_STOP(tg_id_);
-    TG_WAIT(tg_id_);
-    svr_provider_.destroy();
-    systable_helper_.destroy();
+void ObTestbenchMySQLProxy::stop() {
+  TESTBENCH_LOG(INFO, "ObTestbenchMySQLProxy stop begin");
+  sql_conn_pool_.stop();
+  sql_conn_pool_.close_all_connection();
+  TG_STOP(tg_id_);
+  TESTBENCH_LOG(INFO, "ObTestbenchMySQLProxy stop end");
+}
+
+void ObTestbenchMySQLProxy::wait() {
+  TESTBENCH_LOG(INFO, "ObTestbenchMySQLProxy wait begin");
+  TG_WAIT(tg_id_);
+  TESTBENCH_LOG(INFO, "ObTestbenchMySQLProxy wait end");
+}
+
+void ObTestbenchMySQLProxy::destroy() {
+  stop();
+  wait();
+  svr_provider_.destroy();
+  systable_helper_.destroy();
+  is_inited_ = false;
+  if (-1 != tg_id_) {
+    TG_DESTROY(tg_id_);
+    tg_id_ = -1;
   }
-  return ret;
+  TESTBENCH_LOG(INFO, "ObTestbenchMySQLProxy destroy");
 }
 
 int ObTestbenchMySQLProxy::set_server_provider_param(const common::ObAddr &addr) {
@@ -134,6 +145,11 @@ int ObTestbenchMySQLProxy::release_conn(uint32_t session_id, bool success, ObISQ
 ObTestbenchServerProvider *ObTestbenchMySQLProxy::get_server_provider()
 {
   return &svr_provider_;
+}
+
+ObTestbenchSystableHelper *ObTestbenchMySQLProxy::get_systable_helper()
+{
+  return &systable_helper_;
 }
 } // namespace testbench
 } // namespace oceanbase

@@ -17,29 +17,24 @@
 
 namespace oceanbase
 {
-  int __attribute__((weak)) split(const char *str, const char *delimiter, const int expect_res_cnt, char **res, int &res_cnt)
-  {
+  int __attribute__((weak)) split(const char *str, const char *delimiter, const int expect_res_cnt, char **res, int &res_cnt) {
     int ret = OB_SUCCESS;
     res_cnt = 0;
 
     if ((OB_ISNULL(str) || OB_UNLIKELY(0 == strlen(str))) ||
-        (OB_ISNULL(delimiter) || OB_UNLIKELY(0 == strlen(delimiter))))
-    {
+        (OB_ISNULL(delimiter) || OB_UNLIKELY(0 == strlen(delimiter)))) {
       ret = OB_INVALID_ARGUMENT;
       TESTBENCH_LOG(WARN, "split invalid argument", KCSTRING(str), KCSTRING(delimiter));
-    }
-    else
-    {
-      char *rest = const_cast<char *>(str);
-      char *token;
-      while ((token = strtok_r(rest, delimiter, &rest)))
-      {
+    } else {
+      char *str_nonconst = strdup(str);
+      char *token = strtok(str_nonconst, delimiter);
+      while (token != NULL) {
         *res++ = token;
         ++res_cnt;
+        token = strtok(NULL, delimiter);
       }
     }
-    if (expect_res_cnt > 0 && res_cnt != expect_res_cnt)
-    {
+    if (expect_res_cnt > 0 && res_cnt != expect_res_cnt) {
       ret = OB_INVALID_ARGUMENT;
       TESTBENCH_LOG(WARN, "split result count does not match expected count", K(expect_res_cnt), K(res_cnt));
     }

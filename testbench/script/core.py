@@ -385,17 +385,18 @@ class TestBench(object):
         return is_tenant_exist()
     
     def generate_dataset(self):
-        config = getattr(self._opts, "dataset_config", "")
-        if not self.dataset_manager.yaml_init and not self.dataset_manager.create_yaml(config):
+        force_mode = getattr(self._opts, "force", False)
+        if not force_mode and self.dataset_manager.yaml_init and self.dataset_manager.dataset_init:
+            self.stdio.warn("Dataset already exists, cannot generate dataset in non-force mode.")
+            return True
+        config = getattr(self._opts, "config", "")
+        if not self.dataset_manager.create_yaml(config):
             self.stdio.error(
                 "Fail to load dataset config {}".format(config)
             )
             return False
-        force_mode = getattr(self._opts, "force", False)
-        if force_mode or not self.dataset_manager.dataset_init:
-            return self.dataset_manager.generate_dataset()
-        return True
-
+        return self.dataset_manager.generate_dataset()
+    
     def _clear_schema(self):
         rs = self.cluster_manager.root_service
         cursor = MySQLClient.connect(rs, user="root@{}".format(self._tenant_name), database=self._database_name, stdio=self.stdio)

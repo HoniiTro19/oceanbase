@@ -381,14 +381,14 @@ class BenchDataCommand(TestBenchCommand):
             "data", "Generate and save data in the local storage."
         )
         self.parser.add_option(
-            "-d", "--dataset_config", type="string", help="Path to the dataset configuration file."
+            "-c", "--config", type="string", help="Path to the workload configuration file."
         )
         self.parser.add_option(
             "-f", "--force", action="store_true", default=False, help="Overwrite the existing databset."
         )
         
     def _check(self):
-        config = getattr(self.opts, "dataset_config", "")
+        config = getattr(self.opts, "config", "")
         if not config:
             ROOT_IO.error("Fail to generate dataset without configuration file.")
             return False
@@ -408,11 +408,11 @@ class BenchLoadCommand(TestBenchCommand):
             "load", "Populate data into the cluster."
         )
         self.parser.add_option(
-            "-d", "--dataset_config", type="string", help="Path to the dataset configuration file."
+            "-c", "--config", type="string", help="Path to the workload configuration file."
         )
     
     def _check(self):
-        config = getattr(self.opts, "dataset_config", "")
+        config = getattr(self.opts, "config", "")
         if not config:
             ROOT_IO.error("Fail to generate dataset without configuration file.")
             return False
@@ -436,6 +436,17 @@ class BenchTestCommand(TestBenchCommand):
         self.parser.add_option(
             "-c", "--config", type="string", help="Path to the configuration file."
         )
+    
+    def _check(self):
+        config = getattr(self.opts, "config", "")
+        if not config:
+            ROOT_IO.error("Fail to start transaction scheduler without configuration file.")
+            return False
+
+        if not os.path.exists(config):
+            ROOT_IO.error("Configuration file {} does not exist.".format(config))
+            return False
+        return True
 
     def _do_command(self, tb):
         self._do_step("Starting testbench scheduler.", tb.start_scheduler)

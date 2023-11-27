@@ -30,7 +30,9 @@ namespace testbench
   public:
     ObTestbenchMySQLProxy();
     ~ObTestbenchMySQLProxy();
-    int stop_and_destroy();
+    void stop();
+    void wait();
+    void destroy();
     int set_server_provider_param(const common::ObAddr &addr);
     int set_connection_pool_param(const char *user, const char *pass, const char *db);
     int init();
@@ -38,6 +40,7 @@ namespace testbench
     int get_mysql_conn(int64_t dblink_id, uint32_t session_id, ObMySQLConnection *&mysql_conn);
     int release_conn(uint32_t session_id, bool success, ObISQLConnection *conn);
     ObTestbenchServerProvider *get_server_provider();
+    ObTestbenchSystableHelper *get_systable_helper();
 
   private:
     bool is_inited_;

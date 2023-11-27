@@ -100,23 +100,17 @@ class DatasetManager(Manager):
     src_data = yaml_loader.load(f)
     if len(src_data.keys()) <= 0:
       self.stdio.error(
-        "There should be exactly one component in the dataset configuration file."
+        "There should be exactly one component in the workload configuration file."
       )
       return False
     self._component = list(src_data.keys())[0]
     self._component_config = src_data[self._component]
-    if "global" not in self._component_config:
+    if "dataset" not in self._component_config:
       self.stdio.warn(
-        "Cannot find global parameters in the cluster configuration file."
+        "Cannot find dataset parameters in the workload configuration file. {}".format(self._component_config)
       )
     else:
-      self._dataset_config = self._component_config["global"]
-    
-    for name, _ in self._component_config.items():
-      if name != "global":
-        self.stdio.warn(
-          "non-global items in the dataset configuration file is not allowed."
-        )
+      self._dataset_config = self._component_config["dataset"]
     return True
     
   def _remove_dataset(self):
