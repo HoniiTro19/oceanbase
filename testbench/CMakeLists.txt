@@ -26,12 +26,7 @@ add_custom_command(
 )
 
 add_executable(instance_testbench ob_instance_testbench.cpp)
-set_target_properties(instance_testbench PROPERTIES 
-  COMPILE_FLAGS "-O0"
-  LINK_FLAGS "-g"
-  BUILD_TYPE Debug  
-)
-target_link_libraries(instance_testbench PUBLIC ob_testbench_workload)
+target_link_libraries(instance_testbench PUBLIC oceanbase ob_testbench_workload)
 
 add_custom_command(
   TARGET instance_testbench 
