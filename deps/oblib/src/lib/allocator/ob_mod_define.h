@@ -1182,6 +1182,9 @@ LABEL_ITEM_DEF(OB_ROOT_CONTEXT, RootContext)
 LABEL_ITEM_DEF(OB_DML_CHECK_ROWKEY_DISTINCT_BUCKET, DmlChecRowDisBu)
 LABEL_ITEM_DEF(OB_DML_CHECK_ROWKEY_DISTINCT_NODE, DmlChecRowDisNo)
 
+// testbench
+LABEL_ITEM_DEF(OB_TESTBENCH_OPTIONS, TbOpts)
+
 LABEL_ITEM_DEF(OB_MOD_END, ModEnd)
 #endif
 
@@ -1300,7 +1303,7 @@ struct InnerModIds
   #undef LABEL_ITEM_DEF
   };
   enum { LABEL_COUNT_LIMIT = InnerModIds::OB_MOD_END };
-  STATIC_ASSERT(LABEL_COUNT_LIMIT == 1034, "forbidden to add new label!!!");
+  STATIC_ASSERT(LABEL_COUNT_LIMIT == 1035, "forbidden to add new label!!!");
 };
 
 #define ObNewModIds ObModIds

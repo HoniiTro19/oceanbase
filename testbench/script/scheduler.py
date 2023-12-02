@@ -25,8 +25,7 @@ from tool import FileUtil, YamlLoader, OrderedDict
 from manager import Manager
 
 yaml = YamlLoader()
-
-
+          
 class SchedulerManager(Manager):
     RELATIVE_PATH = "scheduler/"
     CONFIG_YAML_NAME = "config.yaml"
@@ -71,38 +70,44 @@ class SchedulerManager(Manager):
     def cmd(self):
         if self._workload_config and self._repo_path:
             return self._parse_cmd()
+        
+    def _get_default_homepath(self):
+        return os.path.join(self.path, "scheduler")
 
     def _parse_cmd(self):
-        type_str = OrderedDict(
+        opts_dict = OrderedDict(
             {
-                "distributed_transaction": "-t",
-                "contention": "-c",
-                "deadlock": "-d",
+                "home_path": "-H",
+                "log_level": "-l",
+                "time": "-t"
             }
         )
-        global_str = OrderedDict(
+        type_opts_dict = OrderedDict(
             {
-                "cluster_host": "-i",
-                "cluster_port": "-P",
-                "cluster_user": "-U",
-                "cluster_password": "-p",
-                "cluster_db_name": "-n",
+                "connection": "-c",
+                "dataset": "-d",
+                "statistics": "-s",
+                "distributed": "-T",
+                "contention": "-C",
+                "deadlock": "-D"
             }
         )
-        cmds = ["-H", self.trace_path]
+        cmds = []
         for name, config in self._workload_config.items():
             if config is None:
                 continue
-            if name in type_str:
-                cmds.append(type_str[name])
+            if name in type_opts_dict:
+                cmds.append(type_opts_dict[name])
                 cmds.append(
                     ",".join(
                         "{}={}".format(key, value) for key, value in config.items()
                     )
                 )
-            elif name in global_str:
-                cmds.append(global_str[name])
+            elif name in opts_dict:
+                cmds.append(opts_dict[name])
                 cmds.append("{}".format(config))
+            else:
+                self.stdio.warn("get unknown options {}:{}".format(name, config))
         self.stdio.verbose("parse cmds {}".format(cmds))
         return "cd {}; {} {}".format(self.trace_path, self.repo, " ".join(cmds))
 
@@ -143,7 +148,7 @@ class SchedulerManager(Manager):
             )
             return False
 
-        self._component = src_data.keys()[0]
+        self._component = list(src_data.keys())[0]
         self._component_config = src_data[self._component]
         self._workload_config = {}
         for type, config in self._component_config.items():

@@ -166,12 +166,11 @@ void ObStatisticsQueueTask::set_histogram_inited() {
 /*
                           ObTestbenchStatisticsCollector
 */
-ObTestbenchStatisticsCollector::ObTestbenchStatisticsCollector(int64_t bucket_capacity, double_t bucket_min_ratio, double_t bucket_max_ratio)
+ObTestbenchStatisticsCollector::ObTestbenchStatisticsCollector()
   : is_inited_(false),
+    thread_num_(1),
+    task_queue_limit_(99999),
     snapshot_ready_(0),
-    bucket_capacity_(bucket_capacity),
-    bucket_min_ratio_(bucket_min_ratio),
-    bucket_max_ratio_(bucket_max_ratio),
     submit_(),
     submit_queues_{},
     histograms_{},
@@ -180,14 +179,18 @@ ObTestbenchStatisticsCollector::ObTestbenchStatisticsCollector(int64_t bucket_ca
 
 ObTestbenchStatisticsCollector::~ObTestbenchStatisticsCollector() {}
 
-int ObTestbenchStatisticsCollector::init() {
+int ObTestbenchStatisticsCollector::init(ObStatisticsCollectorOptions *opts) {
   int ret = OB_SUCCESS;
   if (IS_INIT) {
     ret = OB_INIT_TWICE;
     TESTBENCH_LOG(WARN, "statistics collector has already been inited", K(ret));
+  } else if (OB_ISNULL(opts)) {
+    ret = OB_ERR_UNEXPECTED;
+    TESTBENCH_LOG(ERROR, "statistics collector options are not inited", KR(ret));
   } else if (OB_FAIL(submit_.init())) {
     TESTBENCH_LOG(ERROR, "statistics submit task init failed", K(ret));
   } else {
+    bucket_capacity_ = opts->get_bucket_capacity();
     for (int64_t i = 0; OB_SUCC(ret) && i < TASK_QUEUE_SIZE; ++i) {
       if (OB_FAIL(submit_queues_[i].init(i))) {
         TESTBENCH_LOG(ERROR, "statistics submit queue task init failed", K(ret), K(i));
@@ -199,10 +202,11 @@ int ObTestbenchStatisticsCollector::init() {
     }
   }
   if (OB_SUCC(ret)) {
+    bucket_min_ratio_ = (double)opts->get_bucket_min_percentage() / 100.0;
+    bucket_max_ratio_ = (double)opts->get_bucket_max_percentage() / 100.0;
+    thread_num_ = opts->get_thread_num();
+    task_queue_limit_ = opts->get_task_queue_limit();
     is_inited_ = true;
-  } else if (OB_INIT_TWICE != ret) {
-    destroy();
-    TESTBENCH_LOG(ERROR, "statistics collector init failed", K(ret));
   }
   return ret;
 }
@@ -216,6 +220,10 @@ int ObTestbenchStatisticsCollector::start() {
     TESTBENCH_LOG(ERROR, "statistics collector create threadpool failed", K(ret), K(tg_id_));
   } else if (OB_FAIL(TG_SET_HANDLER_AND_START(tg_id_, *this))) {
     TESTBENCH_LOG(ERROR, "start statistics collector failed", K(tg_id_), K(ret));
+  } else if (OB_FAIL(TG_SET_THREAD_CNT(tg_id_, thread_num_))) {
+    TESTBENCH_LOG(WARN, "set ObTestbenchStatisticsCollector thread cnt fail", KR(ret), K_(thread_num));
+  } else if (OB_FAIL(TG_SET_QUEUE_SIZE(tg_id_, task_queue_limit_))) {
+    TESTBENCH_LOG(WARN, "set ObTestbenchStatisticsCollector queue size fail", KR(ret), K_(task_queue_limit));
   } else {
     TESTBENCH_LOG(INFO, "start statistics collector succeed", K(tg_id_), K(ret));
   }
@@ -243,6 +251,8 @@ void ObTestbenchStatisticsCollector::wait() {
 }
 
 void ObTestbenchStatisticsCollector::destroy() {
+  stop();
+  wait();
   is_inited_ = false;
   if (-1 != tg_id_) {
     TG_DESTROY(tg_id_);
@@ -257,11 +267,12 @@ int ObTestbenchStatisticsCollector::push_task_(ObStatisticsTask *task) {
     ret = OB_NOT_INIT;
     TESTBENCH_LOG(ERROR, "statistics collector is not inited", K(ret));
   } else if (OB_ISNULL(task)) {
+    ret = OB_ERR_UNEXPECTED;
     TESTBENCH_LOG(ERROR, "task is null", K(ret));
   } else {
     while (OB_FAIL(TG_PUSH_TASK(tg_id_, task)) && OB_EAGAIN == ret) {
       ob_usleep(1000);
-      TESTBENCH_LOG(ERROR, "failed to push task", K(ret));
+      TESTBENCH_LOG(ERROR, "statistics collector push task failed", K(ret));
     }
   }
   return ret;
@@ -323,12 +334,8 @@ void ObTestbenchStatisticsCollector::handle(void *task) {
     ret = OB_NOT_INIT;
     TESTBENCH_LOG(ERROR, "statistics collector is not inited", K(ret));
   } else if (OB_ISNULL(task_to_handle)) {
-    ret = OB_INVALID_ARGUMENT;
-    TESTBENCH_LOG(ERROR, "task is null", K(ret));
-  } else if (IS_NOT_INIT) {
-    ret = OB_NOT_INIT;
-    task_to_handle = nullptr;
-    TESTBENCH_LOG(ERROR, "statistics collector is not inited", K(ret));
+    ret = OB_ERR_UNEXPECTED;
+    TESTBENCH_LOG(ERROR, "statistics task is null", K(ret));
   } else {
     ObStatisticsTaskType task_type = task_to_handle->get_type();
     if (ObStatisticsTaskType::STATISTICS_QUEUE_TASK == task_type) {

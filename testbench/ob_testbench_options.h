@@ -20,22 +20,34 @@ namespace oceanbase
 {
   namespace testbench
   {
-    class ObIWorkloadOptions
+    class ObIOptions
     {
     public:
-      ObIWorkloadOptions(const char *src_opt_str);
-      virtual ~ObIWorkloadOptions();
+      ObIOptions(const char *src_opt_str);
+      virtual ~ObIOptions();
       virtual int parse_options();
       virtual int fill_options(const char *key, const char *value) = 0;
-      virtual WorkloadType get_type() = 0;
-      VIRTUAL_TO_STRING_KV(K(start_time_), K(duration_), K(src_opt_str_));
+      VIRTUAL_TO_STRING_KV(K_(src_opt_str));
       
       static const int MAX_OPTS_CNT = 16;
 
     protected:
-      int64_t start_time_;
-      int64_t duration_;
       const char *src_opt_str_;
+    };
+
+    class ObIWorkloadOptions : public ObIOptions
+    {
+    public:
+      ObIWorkloadOptions(const char *src_opt_str);
+      virtual ~ObIWorkloadOptions();
+      virtual int fill_options(const char *key, const char *value) = 0;
+      virtual WorkloadType get_type() = 0;
+      inline int64_t get_thread_num() { return thread_num_; }
+      inline int64_t get_task_queue_limit() { return task_queue_limit_; }
+    
+    protected:
+      int64_t thread_num_;
+      int64_t task_queue_limit_;
     };
 
     class ObDistributedTransactionOptions : public ObIWorkloadOptions
@@ -45,7 +57,9 @@ namespace oceanbase
       virtual ~ObDistributedTransactionOptions() override;
       virtual int fill_options(const char *key, const char *value) override;
       virtual WorkloadType get_type() override;
-      INHERIT_TO_STRING_KV("ObIWorkloadOptions", ObIWorkloadOptions, K(participants_), K(operations_));
+      inline int64_t get_participants() { return participants_; }
+      inline int64_t get_operations() { return operations_; }
+      INHERIT_TO_STRING_KV("ObIWorkloadOptions", ObIWorkloadOptions, K_(participants), K_(operations));
 
     private:
       int64_t participants_;
@@ -59,11 +73,15 @@ namespace oceanbase
       virtual ~ObContentionTransactionOptions() override;
       virtual int fill_options(const char *key, const char *value) override;
       virtual WorkloadType get_type() override;
-      INHERIT_TO_STRING_KV("ObIWorkloadOptions", ObIWorkloadOptions, K(concurrency_), K(operations_));
+      inline int64_t get_concurrency() { return concurrency_; }
+      inline int64_t get_operations() { return operations_; }
+      inline int64_t get_aborts() { return aborts_; }
+      INHERIT_TO_STRING_KV("ObIWorkloadOptions", ObIWorkloadOptions, K_(concurrency), K_(operations), K_(aborts));
 
     private:
       int64_t concurrency_;
       int64_t operations_;
+      int64_t aborts_;
     };
 
     class ObDeadlockTransactionOptions : public ObIWorkloadOptions
@@ -73,12 +91,75 @@ namespace oceanbase
       virtual ~ObDeadlockTransactionOptions() override;
       virtual int fill_options(const char *key, const char *value) override;
       virtual WorkloadType get_type() override;
-      INHERIT_TO_STRING_KV("ObIWorkloadOptions", ObIWorkloadOptions, K(concurrency_), K(chains_));
+      inline int64_t get_partitions() { return partitions_; }
+      inline int64_t get_concurrency() { return concurrency_; }
+      inline int64_t get_chains() { return chains_; }
+      INHERIT_TO_STRING_KV("ObIWorkloadOptions", ObIWorkloadOptions, K_(partitions), K_(concurrency), K_(chains));
     
     private:
+      int64_t partitions_;
       int64_t concurrency_;
       int64_t chains_;
     };
-  }
-}
+
+    class ObDatasetOptions : public ObIOptions
+    {
+    public:
+      ObDatasetOptions(const char *opt_str);
+      virtual ~ObDatasetOptions() override;
+      virtual int fill_options(const char *key, const char *value) override;
+      inline int64_t get_partitions() { return partitions_; }
+      inline int64_t get_rows() { return rows_; }
+      INHERIT_TO_STRING_KV("ObIOptions", ObIOptions, K_(partitions), K_(rows));
+    
+    private:
+      int64_t partitions_;
+      int64_t rows_;
+    };
+
+    class ObStatisticsCollectorOptions : public ObIOptions
+    {
+    public:
+      ObStatisticsCollectorOptions(const char *opt_str);
+      virtual ~ObStatisticsCollectorOptions() override;
+      virtual int fill_options(const char *key, const char *value) override;
+      inline int64_t get_bucket_capacity() { return bucket_capacity_; }
+      inline int64_t get_bucket_min_percentage() { return bucket_min_percentage_; }
+      inline int64_t get_bucket_max_percentage() { return bucket_max_percentage_; }
+      inline int64_t get_thread_num() { return thread_num_; }
+      inline int64_t get_task_queue_limit() { return task_queue_limit_; }
+      INHERIT_TO_STRING_KV("ObIOptions", ObIOptions, K_(bucket_capacity), K_(bucket_min_percentage), K_(bucket_max_percentage), K_(thread_num), K_(task_queue_limit));
+
+    private:
+      int64_t bucket_capacity_;
+      int64_t bucket_min_percentage_;
+      int64_t bucket_max_percentage_;
+      int64_t thread_num_;
+      int64_t task_queue_limit_;
+    };
+
+    class ObConnectionOptions : public ObIOptions
+    {
+    public:
+      ObConnectionOptions(const char *opt_str);
+      virtual ~ObConnectionOptions() override;
+      virtual int fill_options(const char *key, const char *value) override;
+      inline const char *get_cluster_host() { return cluster_host_; }
+      inline const char *get_cluster_user() { return cluster_user_; }
+      inline int32_t get_cluster_port() { return cluster_port_; }
+      inline const char *get_cluster_pass() { return cluster_pass_; }
+      inline const char *get_cluster_db_name() { return cluster_db_name_; }
+      inline const char *get_cluster_table_name() { return cluster_table_name_; }
+      INHERIT_TO_STRING_KV("ObIOptions", ObIOptions, KCSTRING_(cluster_host), KCSTRING_(cluster_user), K_(cluster_port), KCSTRING_(cluster_pass), KCSTRING_(cluster_db_name), KCSTRING_(cluster_table_name));
+    
+    private:
+      char cluster_host_[OB_MAX_HOST_NAME_LENGTH];
+      char cluster_user_[OB_MAX_USER_NAME_BUF_LENGTH];
+      int32_t cluster_port_;
+      char cluster_pass_[OB_MAX_PASSWORD_BUF_LENGTH];
+      char cluster_db_name_[OB_MAX_DATABASE_NAME_BUF_LENGTH];
+      char cluster_table_name_[OB_MAX_TABLE_NAME_BUF_LENGTH];
+    };
+  } // namespace testbench
+} // namespace oceanbase
 #endif

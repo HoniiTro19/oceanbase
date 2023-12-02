@@ -19,7 +19,9 @@ namespace testbench
 {
 ObTestbenchLocationCache::ObTestbenchLocationCache() : partition_info_(), svr_ips_(), random_() {}
 
-ObTestbenchLocationCache::~ObTestbenchLocationCache() { 
+ObTestbenchLocationCache::~ObTestbenchLocationCache() {}
+
+void ObTestbenchLocationCache::destroy() {
   partition_info_.destroy();
   svr_ips_.destroy();
 }
@@ -37,11 +39,6 @@ int ObTestbenchLocationCache::init(const char *database_name, const char *table_
     TESTBENCH_LOG(ERROR, "create partition info map failed", KR(ret), "bucket_cnt", sql_server_list.count());
   }
   return ret;
-}
-
-void ObTestbenchLocationCache::destroy() {
-  partition_info_.destroy();
-  svr_ips_.destroy();
 }
 
 int ObTestbenchLocationCache::refresh_locations() {
@@ -66,6 +63,7 @@ int ObTestbenchLocationCache::refresh_locations() {
   return ret;
 }
 
+// TODO generate partitions according to server id
 int ObTestbenchLocationCache::generate_different_partitions(int64_t target, Parameters &parameters) {
   int ret = OB_SUCCESS;
   int64_t svr_count = svr_ips_.count();

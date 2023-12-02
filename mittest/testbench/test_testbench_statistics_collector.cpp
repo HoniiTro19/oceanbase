@@ -11,7 +11,7 @@ using namespace testbench;
 class TestStatisticsCollector : public ::testing::Test {
 public:
   TestStatisticsCollector() 
-  : statistics_collector(bucket_capacity, bucket_min_ratio, bucket_max_ratio),
+  : statistics_collector(),
     random(),
     allocator("StatCollector")
   {}
@@ -22,16 +22,14 @@ public:
   void Tear();
 
 public:
-  int64_t bucket_capacity = 500;
-  double_t bucket_min_ratio = 0.1;
-  double_t bucket_max_ratio = 0.7;
+  ObStatisticsCollectorOptions opts {"capacity=500,minimum=10,maximum=80,threads=1,tasks=99999"};
   ObTestbenchStatisticsCollector statistics_collector;
   ObRandom random;
   ObArenaAllocator allocator;
 };
 
 void TestStatisticsCollector::SetUp() {
-  ASSERT_EQ(OB_SUCCESS, statistics_collector.init());
+  ASSERT_EQ(OB_SUCCESS, statistics_collector.init(&opts));
   ASSERT_EQ(OB_SUCCESS, statistics_collector.start());
 }
 

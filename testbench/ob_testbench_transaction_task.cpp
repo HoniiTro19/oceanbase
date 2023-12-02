@@ -22,13 +22,11 @@ namespace testbench
 ObIWorkloadTransactionTask::ObIWorkloadTransactionTask(BasicTaskConfig config) 
 : table_name_(config.table_name), 
   connection_count_(config.connections),
-  connection_pool_(config.connection_pool),
+  mysql_proxy_(config.mysql_proxy),
   latency_collector_(config.collector),
   dblink_id_(config.dblink_id),
   partition_id_(config.partition_id),
   row_id_start_(config.row_id_start),
-  success_(0),
-  failure_(0),
   allocator_("TxnTask")
 {}
 
@@ -57,7 +55,7 @@ int ObIWorkloadTransactionTask::prepare_arrays() {
       latencys_.at(i) = 0;
       cumulative_latencys_.at(i) = 0;
       commits_.at(i) = true;
-      if (OB_FAIL(connection_pool_->acquire_dblink(dblink_id_, dblink_param_ctx(), connections_.at(i), 0, 0, true))) {
+      if (OB_FAIL(mysql_proxy_->get_mysql_conn(dblink_id_, 0, connections_.at(i)))) {
         TESTBENCH_LOG(ERROR, "acquire dblink connection failed", K(ret), K(dblink_id_));
       }
     }
@@ -67,24 +65,14 @@ int ObIWorkloadTransactionTask::prepare_arrays() {
 
 int ObIWorkloadTransactionTask::init() {
   int ret = OB_SUCCESS;
-  if (OB_ISNULL(connection_pool_)) {
+  if (OB_ISNULL(mysql_proxy_)) {
     ret = OB_ERR_UNEXPECTED;
-    TESTBENCH_LOG(ERROR, "the connection pool is not inited", K(ret), KP(connection_pool_));
+    TESTBENCH_LOG(ERROR, "the connection pool is not inited", K(ret), KP(mysql_proxy_));
   } else if (OB_ISNULL(latency_collector_)) {
     ret = OB_ERR_UNEXPECTED;
     TESTBENCH_LOG(ERROR, "the latency collector is not inited", K(ret), KP(latency_collector_));
   } else if (OB_FAIL(prepare_arrays())) {
     TESTBENCH_LOG(ERROR, "acquire mysql connections failed", K(ret));
-  }
-  return ret;
-}
-
-int ObIWorkloadTransactionTask::release_dblinks() {
-  int ret = OB_SUCCESS;
-  for (int64_t i = 0; i < connection_count_; ++i) {
-    if (OB_FAIL(connection_pool_->release_dblink(connections_.at(i), commits_.at(i)))) {
-      TESTBENCH_LOG(ERROR, "release dblink failed", K(ret));
-    }
   }
   return ret;
 }
@@ -143,10 +131,9 @@ int ObDistributedTransactionTask::release_dblinks() {
   for (int64_t i = 0; i < connection_count_; ++i) {
     if (OB_FAIL(lock_txn_stmts_.at(i).close())) {
       TESTBENCH_LOG(WARN, "close lock transaction statement failed", "conn_idx", i, K(ret));
+    } else if (OB_FAIL(mysql_proxy_->release_conn(0, commits_.at(i), connections_.at(i)))) {
+      TESTBENCH_LOG(ERROR, "release dblink failed", K(ret));
     }
-  }
-  if (OB_FAIL(ObIWorkloadTransactionTask::release_dblinks())) {
-    TESTBENCH_LOG(WARN, "release dblinks failed", K(ret));
   }
   return ret;
 }
@@ -161,11 +148,10 @@ int ObDistributedTransactionTask::init() {
     TESTBENCH_LOG(ERROR, "get format lock_txn_sql failed", K(ret), K(lock_txn_sql_));
   } else {
     for (int64_t i = 0; i < connection_count_; ++i) {
-      if (OB_FAIL(connections_.at(i)->prepare_statement(lock_txn_stmts_.at(i), lock_txn_sql_.ptr()))) {
-        TESTBENCH_LOG(ERROR, "prepare statement failed", K(ret));
+      if (OB_SUCC(ret) && OB_FAIL(connections_.at(i)->prepare_statement(lock_txn_stmts_.at(i), lock_txn_sql_.ptr()))) {
+        TESTBENCH_LOG(ERROR, "prepare statement failed", KR(ret), "sql", lock_txn_sql_.ptr());
       }
     }
-    TESTBENCH_LOG(DEBUG, "distributed transaction task init succeed", K(participants_), K(operations_), K(lock_txn_sql_));
   }
   return ret;
 }
@@ -200,7 +186,7 @@ int ObDistributedTransactionTask::execute_transactions() {
       }
     }
   }
-  // commit or rollback transactions
+  // always commit or rollback transactions
   for (int64_t conn_idx = 0; OB_SUCC(ret) && conn_idx < connection_count_; ++conn_idx) {
     if (OB_FAIL(wait_for_connection(connections_.at(conn_idx)))) {
       TESTBENCH_LOG(WARN, "wait for the connection get error", K(ret));
@@ -219,18 +205,19 @@ int ObDistributedTransactionTask::execute_transactions() {
     if (OB_FAIL(wait_for_connection(connections_.at(conn_idx)))) {
       TESTBENCH_LOG(WARN, "wait for the connection get error", K(ret));
       commits_.at(conn_idx) = false;
-    } else if (OB_UNLIKELY(false == commits_.at(conn_idx))) {
-      failure_ += 1;
     } else {
       latencys_.at(conn_idx) = common::ObTimeUtility::current_time() - latencys_.at(conn_idx);
       cumulative_latencys_.at(conn_idx) = common::ObTimeUtility::current_time() - cumulative_latencys_.at(conn_idx);
-      if (OB_FAIL(record_latency(ObLatencyTaskType::COMMIT_SQL_LATENCY_TASK, latencys_.at(conn_idx)))) {
-        TESTBENCH_LOG(WARN, "record the latency of commit sql failed", K(ret));
-      } else if (OB_FAIL(record_latency(ObLatencyTaskType::DISTRIBUTED_TXN_LATENCY_TASK, latencys_.at(conn_idx)))) {
-        TESTBENCH_LOG(WARN, "record the latency of distributed transaction failed", K(ret));
+      if (OB_UNLIKELY(false == commits_.at(conn_idx))) {
+        if (OB_FAIL(record_latency(ObLatencyTaskType::ROLLBACK_TXN_LATENCY_TASK, cumulative_latencys_.at(conn_idx)))) {
+          TESTBENCH_LOG(WARN, "record the latency of rollback transaction failed", KR(ret), "txn_latency", cumulative_latencys_.at(conn_idx));          
+        }
+      } else if (OB_FAIL(record_latency(ObLatencyTaskType::COMMIT_SQL_LATENCY_TASK, latencys_.at(conn_idx)))) {
+        TESTBENCH_LOG(WARN, "record the latency of commit sql failed", KR(ret), "commit_latency", latencys_.at(conn_idx));
+      } else if (OB_FAIL(record_latency(ObLatencyTaskType::DISTRIBUTED_TXN_LATENCY_TASK, cumulative_latencys_.at(conn_idx)))) {
+        TESTBENCH_LOG(WARN, "record the latency of distributed transaction failed", KR(ret), "txn_latency", cumulative_latencys_.at(conn_idx));
       } else {
-        success_ += 1;
-        TESTBENCH_LOG(DEBUG, "distributed transaction commit success", "commit_latency", latencys_.at(conn_idx));
+        TESTBENCH_LOG(DEBUG, "distributed transaction commit success", "commit_latency", latencys_.at(conn_idx), "txn_latency", cumulative_latencys_.at(conn_idx));
       }
     }
   }
@@ -262,11 +249,10 @@ int ObContentionTransactionTask::init() {
     TESTBENCH_LOG(ERROR, "get format lock_elr_sql_ failed", K(ret), K(lock_elr_sql_));
   } else {
     for (int64_t i = 0; i < connection_count_; ++i) {
-      if (OB_FAIL(connections_.at(i)->prepare_statement(lock_elr_stmts_.at(i), lock_elr_sql_.ptr()))) {
-        TESTBENCH_LOG(ERROR, "prepare statement failed", K(ret));
+      if (OB_SUCC(ret) && OB_FAIL(connections_.at(i)->prepare_statement(lock_elr_stmts_.at(i), lock_elr_sql_.ptr()))) {
+        TESTBENCH_LOG(ERROR, "prepare statement failed", KR(ret), "sql", lock_elr_sql_.ptr());
       }
     }
-    TESTBENCH_LOG(DEBUG, "contention transaction task init succeed", K(aborts_), K(operations_), K(lock_elr_sql_));
   }
   return ret;
 }
@@ -336,17 +322,18 @@ int ObContentionTransactionTask::execute_transactions() {
     if (OB_FAIL(wait_for_connection(connections_.at(conn_idx)))) {
       TESTBENCH_LOG(WARN, "wait for the connection get error", K(ret));
       commits_.at(conn_idx) = false;
-    } else if (OB_UNLIKELY(false == commits_.at(conn_idx))) {
-      failure_ += 1;
     } else {
       cumulative_latencys_.at(conn_idx) = common::ObTimeUtility::current_time() - cumulative_latencys_.at(conn_idx);
-      if (OB_FAIL(record_latency(ObLatencyTaskType::LOCK_SQL_LATENCY_TASK, latencys_.at(conn_idx)))) {
-        TESTBENCH_LOG(WARN, "record the latency of commit sql failed", K(ret));
+      if (OB_UNLIKELY(false == commits_.at(conn_idx))) {
+        if (OB_FAIL(record_latency(ObLatencyTaskType::ROLLBACK_TXN_LATENCY_TASK, cumulative_latencys_.at(conn_idx)))) {
+          TESTBENCH_LOG(WARN, "record the latency of rollback transaction failed", KR(ret), "txn_latency", cumulative_latencys_.at(conn_idx));
+        }
+      } else if (OB_FAIL(record_latency(ObLatencyTaskType::LOCK_SQL_LATENCY_TASK, latencys_.at(conn_idx)))) {
+        TESTBENCH_LOG(WARN, "record the latency of commit sql failed", KR(ret), "lock_latency", latencys_.at(conn_idx));
       } else if (OB_FAIL(record_latency(ObLatencyTaskType::CONTENTION_TXN_LATENCY_TASK, latencys_.at(conn_idx)))) {
-        TESTBENCH_LOG(WARN, "record the latency of contention transaction failed", K(ret));
+        TESTBENCH_LOG(WARN, "record the latency of contention transaction failed", KR(ret), "txn_latency", cumulative_latencys_.at(conn_idx));
       } else {
-        success_ += 1;
-        TESTBENCH_LOG(DEBUG, "contention transaction commit success", K(latencys_.at(conn_idx)));
+        TESTBENCH_LOG(DEBUG, "contention transaction commit success", "lock_latency", latencys_.at(conn_idx), "txn_latency", cumulative_latencys_.at(conn_idx));
       }
     }
   }
@@ -358,10 +345,9 @@ int ObContentionTransactionTask::release_dblinks() {
   for (int64_t i = 0; i < connection_count_; ++i) {
     if (OB_FAIL(lock_elr_stmts_.at(i).close())) {
       TESTBENCH_LOG(WARN, "close lock transaction statement failed", "conn_idx", i, K(ret));
+    } else if (OB_FAIL(mysql_proxy_->release_conn(0, commits_.at(i), connections_.at(i)))) {
+      TESTBENCH_LOG(ERROR, "release dblink failed", K(ret));
     }
-  }
-  if (OB_FAIL(ObIWorkloadTransactionTask::release_dblinks())) {
-    TESTBENCH_LOG(WARN, "release dblinks failed", K(ret));
   }
   return ret;
 }
@@ -391,10 +377,10 @@ int ObDeadlockTransactionTask::init() {
     TESTBENCH_LOG(ERROR, "get format lock_lcl_sql_ failed", K(ret), K(lock_lcl_sql_));
   } else {
     for (int64_t i = 0; i < connection_count_; ++i) {
-      connections_.at(i)->prepare_statement(lock_lcl_stmts_.at(i), lock_lcl_sql_.ptr());
-      TESTBENCH_LOG(ERROR, "prepare statement failed", K(ret));
+      if (OB_SUCC(ret) && OB_FAIL(connections_.at(i)->prepare_statement(lock_lcl_stmts_.at(i), lock_lcl_sql_.ptr()))) {
+        TESTBENCH_LOG(ERROR, "prepare statement failed", KR(ret), "sql", lock_lcl_sql_.ptr());
+      }
     }
-    TESTBENCH_LOG(DEBUG, "deadlock transaction task init succeed", K(chains_), K(lock_lcl_sql_));
   }
   return ret;
 }
@@ -408,10 +394,9 @@ int ObDeadlockTransactionTask::release_dblinks() {
   for (int64_t i = 0; i < connection_count_; ++i) {
     if (OB_FAIL(lock_lcl_stmts_.at(i).close())) {
       TESTBENCH_LOG(WARN, "close lock transaction statement failed", "conn_idx", i, K(ret));
+    } else if (OB_FAIL(mysql_proxy_->release_conn(0, commits_.at(i), connections_.at(i)))) {
+      TESTBENCH_LOG(ERROR, "release dblink failed", K(ret));
     }
-  }
-  if (OB_FAIL(ObIWorkloadTransactionTask::release_dblinks())) {
-    TESTBENCH_LOG(WARN, "release dblinks failed", K(ret));
   }
   return ret;
 }

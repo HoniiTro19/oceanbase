@@ -33,25 +33,6 @@ namespace testbench
   X(CONTENTION, "contention")                           \
   X(DEADLOCK, "deadlock")
 
-#define ADD_WORKLOAD_OPTS(opts, id, src_opt_str)                                                    \
-  ({                                                                                                \
-    int ret = OB_SUCCESS;                                                                           \
-    switch (id) {                                                                                   \
-      case DISTRIBUTED_TRANSACTION:                                                                 \
-        opts.push_back(OB_NEW(ObDistributedTransactionOptions, "WorkloadOptions", src_opt_str));    \
-        break;                                                                                      \
-      case CONTENTION:                                                                              \
-        opts.push_back(OB_NEW(ObContentionTransactionOptions, "WorkloadOptions", src_opt_str));     \
-        break;                                                                                      \
-      case DEADLOCK:                                                                                \
-        opts.push_back(OB_NEW(ObDeadlockTransactionOptions, "WorkloadOptions", src_opt_str));       \
-        break;                                                                                      \
-      default:                                                                                      \
-        TESTBENCH_LOG(ERROR, "undefined workload type", K(id));                                     \
-        break;                                                                                      \
-    }                                                                                               \
-  })
-
 #define X(key, value) key,
   enum WorkloadType
   {
@@ -67,11 +48,10 @@ namespace testbench
 /*
  *                                        workload options macros
  */ 
-
 // global workload options macros
 #define GLOBAL_OPTIONS       \
-  X(STARTTIME, "start_time") \
-  X(DURATION, "duration")
+  X(THREADS, "threads") \
+  X(TASKS, "tasks")
 
 // distributed transaction workload options macros
 #define DISTRIBUTED_TXN_OPTIONS              \
@@ -85,6 +65,7 @@ namespace testbench
   GLOBAL_OPTIONS                            \
   X(CONCURRENCY, "concurrency")             \
   X(OPERATIONS, "operations")               \
+  X(ABORTS, "aborts")                       \
   X(END, "end")
 
 // deadlock transaction workload options macros
@@ -93,6 +74,31 @@ namespace testbench
   X(CONCURRENCY, "concurrency")             \
   X(CHAINS, "chains")                       \
   X(END, "end")  
+
+// dataset options macros
+#define DATASET_OPTIONS                      \
+  X(PARTITIONS, "partitions")                \
+  X(ROWS, "rows")                            \
+  X(END, "end")
+
+// statistics collector options macros
+#define STATISTICS_OPTIONS                   \
+  X(CAPACITY, "capacity")                    \
+  X(MINIMUM, "minimum")                      \
+  X(MAXIMUM, "maximum")                      \
+  X(THREADS, "threads")                      \
+  X(TASKS, "tasks")                          \
+  X(END, "end")
+
+// connection options macros
+#define CONNECTION_OPTIONS                  \
+  X(HOST, "host")                           \
+  X(USER, "user")                           \
+  X(PORT, "port")                           \
+  X(PASSWORD, "password")                   \
+  X(DATABASE, "database")                   \
+  X(TABLE, "table")                         \
+  X(END, "end")
 
 #define X(key, value) key,
   enum class DistributedTxnOptions
@@ -109,12 +115,30 @@ namespace testbench
   {
     DEADLOCK_TXN_OPTIONS
   };
+
+  enum class DatasetOptions
+  {
+    DATASET_OPTIONS
+  };
+
+  enum class StatisticsOptions
+  {
+    STATISTICS_OPTIONS
+  };
+
+  enum class ConnectionOptions
+  {
+    CONNECTION_OPTIONS
+  };
 #undef X
 
 #define X(key, value) value,
   const char *const distributed_txn_opts[] = { DISTRIBUTED_TXN_OPTIONS };
   const char *const contention_txn_opts[] = { CONTENTION_TXN_OPTIONS };
   const char *const deadlock_txn_opts[] = { DEADLOCK_TXN_OPTIONS };
+  const char *const dataset_opts[] = { DATASET_OPTIONS };
+  const char *const statistics_opts[] = { STATISTICS_OPTIONS };
+  const char *const connection_opts[] = { CONNECTION_OPTIONS };
 #undef X
 } // namespace testbench
 } // namespace oceanbase

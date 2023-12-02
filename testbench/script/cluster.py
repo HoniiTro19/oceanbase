@@ -53,7 +53,7 @@ class Server(object):
     def cmd(self):
         if self._cmd:
             return self._cmd
-        if self._cmds and self.get_conf("home_path") and self._repo_path:
+        if self._cmds and self._repo_path:
             self._cmd = self._parse_cmd()
             return self._cmd
         return None
@@ -67,9 +67,6 @@ class Server(object):
             self.get_conf("work_space"), self.repo, " ".join(self._cmds)
         )
 
-    def _get_default_homepath(self):
-        return os.path.join(self.path, "cluster")
-
     def _get_pid_path(self):
         return os.path.join(self.get_conf("work_space"), "run", "observer.pid")
 
@@ -80,8 +77,6 @@ class Server(object):
         self._conf[key] = value
 
     def parse_config(self):
-        if not self.get_conf("home_path"):
-            self.set_conf("home_path", self._get_default_homepath())
         self.set_conf(
             "work_space",
             os.path.join(self.get_conf("home_path"), self.get_conf("server_name")),
@@ -136,7 +131,6 @@ class Server(object):
                 self._cmds.append("{} {}".format(not_opt_str[key], value))
         self._cmds.append("-o {}".format(",".join(opt_str)))
 
-
 class ClusterManager(Manager):
     RELATIVE_PATH = "cluster/"
     CLUSTER_YAML_NAME = "config.yaml"
@@ -167,6 +161,9 @@ class ClusterManager(Manager):
     @property
     def yaml_init(self):
         return os.path.exists(self.yaml_path)
+    
+    def _get_default_homepath(self):
+        return os.path.join(self.path, "cluster")
 
     def _lock(self, read_only=False):
         if self._lock_manager:
@@ -249,6 +246,11 @@ class ClusterManager(Manager):
         for name, server in self._server_config.items():
             server.set_conf("server_name", name)
             server.set_conf("rs_list_opt", rs_list_opt)
+            if not server.get_conf("home_path"):
+                self.stdio.warn(
+                    "Home path does not exist in the configuration file. Use default value."
+                )
+                server.set_conf("home_path", self._get_default_homepath())
             server.parse_config()
         return True
 
