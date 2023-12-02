@@ -24,9 +24,7 @@ public:
   uint64_t dblink_id;
   static const int64_t CONCURRENT_LINKS = 50;
   ObTestbenchMySQLProxy mysql_proxy;
-  int64_t bucket_capacity = 500;
-  double_t bucket_min_ratio = 0.1;
-  double_t bucket_max_ratio = 0.7;
+  ObStatisticsCollectorOptions opts {"capacity=500,minimum=10,maximum=80,threads=1,tasks=99999"};
   ObTestbenchStatisticsCollector statistics_collector;
   const char *table_name = "testbench";
   ObRandom random;
@@ -42,7 +40,8 @@ void TestTransactionTask::SetUp() {
   ASSERT_EQ(OB_SUCCESS, mysql_proxy.set_connection_pool_param(user, pass, db));
   ASSERT_EQ(OB_SUCCESS, mysql_proxy.init());
   ASSERT_EQ(OB_SUCCESS, mysql_proxy.start_service());
-  ASSERT_EQ(OB_SUCCESS, statistics_collector.init(bucket_capacity, bucket_min_ratio, bucket_max_ratio));
+  ASSERT_EQ(OB_SUCCESS, opts.parse_options());
+  ASSERT_EQ(OB_SUCCESS, statistics_collector.init(&opts));
   ASSERT_EQ(OB_SUCCESS, statistics_collector.start());
   ObTestbenchServerProvider *server_provider = mysql_proxy.get_server_provider();
   ObSEArray<ObFixedLengthString<OB_MAX_TENANT_NAME_LENGTH + 1>, 16>

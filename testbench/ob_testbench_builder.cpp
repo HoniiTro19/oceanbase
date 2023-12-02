@@ -132,7 +132,7 @@ int ObTestbenchBuilder::init_sql_proxy() {
 
 int ObTestbenchBuilder::init_statistics_collector() {
   int ret = OB_SUCCESS;
-  if (OB_FAIL(statistics_collector_.init(opts_->statistics_opts_->get_bucket_capacity(), opts_->statistics_opts_->get_bucket_max_percentage(), opts_->statistics_opts_->get_bucket_min_percentage()))) {
+  if (OB_FAIL(statistics_collector_.init(opts_->statistics_opts_))) {
     TESTBENCH_LOG(ERROR, "ObTestbenchBuilder init statistics collector failed", KR(ret), "statistics_options", statistics_opts);
   } else {
     TESTBENCH_LOG(INFO, "ObTestbenchBuilder init statistics collector succeed");

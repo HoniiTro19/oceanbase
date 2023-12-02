@@ -157,30 +157,30 @@ void ObTestbenchTransactionScheduler::run1() {
 void ObTestbenchTransactionScheduler::generate_distributed_txn_task() {
   int ret = OB_SUCCESS;
   ObDistributedTransactionOptions *options = static_cast<ObDistributedTransactionOptions*>(workload_options_);
-  int64_t partitions = options->get_participants();
-  int64_t operations = options->get_operations();
   Parameters partition_ids;
   if (OB_ISNULL(options)) {
     ret = OB_ERR_UNEXPECTED;
     TESTBENCH_LOG(ERROR, "cast ObIWorkloadOptions to ObDistributedTransactionOptions failed", KR(ret), KP(workload_options_)); 
-  } else if (OB_FAIL(location_cache_.generate_different_partitions(partitions, partition_ids))) {
-    TESTBENCH_LOG(ERROR, "generate distinct partitions failed", KR(ret), "target", partitions);
-  }
-
-  if (OB_SUCC(ret)) {
-    ObDistributedTransactionTask *task = nullptr;
-    void *buf = nullptr;
-    BasicTaskConfig config{ table_name_, 1, statistics_collector_, dblink_ids_.at(cur_conn_id_), mysql_proxy_, partition_ids, cur_row_id_ };
-    cur_conn_id_ = (cur_conn_id_ + 1) % dblink_ids_.count();
-    cur_row_id_ = (cur_row_id_ + operations) % dataset_options_->get_rows();
-    if (OB_ISNULL(buf = allocator_.alloc(sizeof(ObDistributedTransactionTask)))) {
-      ret = OB_ALLOCATE_MEMORY_FAILED;
-      TESTBENCH_LOG(ERROR, "allocate memory failed", KR(ret));
-    } else if (OB_ISNULL(task = new(buf)ObDistributedTransactionTask(config, partitions, operations))) {
-      ret = OB_ERR_UNEXPECTED;
-      TESTBENCH_LOG(ERROR, "create new distributed transaction task failed", KR(ret));
-    } else if (OB_FAIL(executor_pool_->push_task(task))) {
-      TESTBENCH_LOG(ERROR, "push new distributed transaction task failed", KR(ret));
+  } else {
+    int64_t partitions = options->get_participants();
+    int64_t operations = options->get_operations();
+    if (OB_FAIL(location_cache_.generate_different_partitions(partitions, partition_ids))) {
+      TESTBENCH_LOG(ERROR, "generate distinct partitions failed", KR(ret), "target", partitions);
+    } else {
+      ObDistributedTransactionTask *task = nullptr;
+      void *buf = nullptr;
+      BasicTaskConfig config{ table_name_, 1, statistics_collector_, dblink_ids_.at(cur_conn_id_), mysql_proxy_, partition_ids, cur_row_id_ };
+      cur_conn_id_ = (cur_conn_id_ + 1) % dblink_ids_.count();
+      cur_row_id_ = (cur_row_id_ + operations) % dataset_options_->get_rows();
+      if (OB_ISNULL(buf = allocator_.alloc(sizeof(ObDistributedTransactionTask)))) {
+        ret = OB_ALLOCATE_MEMORY_FAILED;
+        TESTBENCH_LOG(ERROR, "allocate memory failed", KR(ret));
+      } else if (OB_ISNULL(task = new(buf)ObDistributedTransactionTask(config, partitions, operations))) {
+        ret = OB_ERR_UNEXPECTED;
+        TESTBENCH_LOG(ERROR, "create new distributed transaction task failed", KR(ret));
+      } else if (OB_FAIL(executor_pool_->push_task(task))) {
+        TESTBENCH_LOG(ERROR, "push new distributed transaction task failed", KR(ret));
+      }
     }
   }
 }
@@ -188,31 +188,31 @@ void ObTestbenchTransactionScheduler::generate_distributed_txn_task() {
 void ObTestbenchTransactionScheduler::generate_contention_txn_task() {
   int ret = OB_SUCCESS;
   ObContentionTransactionOptions *options = static_cast<ObContentionTransactionOptions*>(workload_options_);
-  int64_t concurrency = options->get_concurrency();
-  int64_t operations = options->get_operations();
-  int64_t aborts = options->get_aborts();
   Parameters partition_ids;
   if (OB_ISNULL(options)) {
     ret = OB_ERR_UNEXPECTED;
     TESTBENCH_LOG(ERROR, "cast ObIWorkloadOptions to ObContentionTransactionOptions failed", KR(ret), KP(workload_options_));
-  } else if (OB_FAIL(location_cache_.generate_different_partitions(1, partition_ids))) {
-    TESTBENCH_LOG(ERROR, "generate distinct partitions failed", KR(ret), "target", 1);
-  }
-
-  if (OB_SUCC(ret)) {
-    ObContentionTransactionTask *task = nullptr;
-    void *buf = nullptr;
-    BasicTaskConfig config{ table_name_, concurrency, statistics_collector_, dblink_ids_.at(cur_conn_id_), mysql_proxy_, partition_ids, cur_row_id_ };
-    cur_conn_id_ = (cur_conn_id_ + 1) % dblink_ids_.count();
-    cur_row_id_ = (cur_row_id_ + concurrency * operations) % dataset_options_->get_rows();
-    if (OB_ISNULL(buf = allocator_.alloc(sizeof(ObContentionTransactionTask)))) {
-      ret = OB_ALLOCATE_MEMORY_FAILED;
-      TESTBENCH_LOG(ERROR, "allocate memory failed", KR(ret));
-    } else if (OB_ISNULL(task = new(buf)ObContentionTransactionTask(config, aborts, operations))) {
-      ret = OB_ERR_UNEXPECTED;
-      TESTBENCH_LOG(ERROR, "create new contention transaction task failed", KR(ret));
-    } else if (OB_FAIL(executor_pool_->push_task(task))) {
-      TESTBENCH_LOG(ERROR, "push new contention transaction task failed", KR(ret));
+  } else {
+    int64_t concurrency = options->get_concurrency();
+    int64_t operations = options->get_operations();
+    int64_t aborts = options->get_aborts();
+    if (OB_FAIL(location_cache_.generate_different_partitions(1, partition_ids))) {
+      TESTBENCH_LOG(ERROR, "generate distinct partitions failed", KR(ret), "target", 1);
+    } else {
+      ObContentionTransactionTask *task = nullptr;
+      void *buf = nullptr;
+      BasicTaskConfig config{ table_name_, concurrency, statistics_collector_, dblink_ids_.at(cur_conn_id_), mysql_proxy_, partition_ids, cur_row_id_ };
+      cur_conn_id_ = (cur_conn_id_ + 1) % dblink_ids_.count();
+      cur_row_id_ = (cur_row_id_ + concurrency * operations) % dataset_options_->get_rows();
+      if (OB_ISNULL(buf = allocator_.alloc(sizeof(ObContentionTransactionTask)))) {
+        ret = OB_ALLOCATE_MEMORY_FAILED;
+        TESTBENCH_LOG(ERROR, "allocate memory failed", KR(ret));
+      } else if (OB_ISNULL(task = new(buf)ObContentionTransactionTask(config, aborts, operations))) {
+        ret = OB_ERR_UNEXPECTED;
+        TESTBENCH_LOG(ERROR, "create new contention transaction task failed", KR(ret));
+      } else if (OB_FAIL(executor_pool_->push_task(task))) {
+        TESTBENCH_LOG(ERROR, "push new contention transaction task failed", KR(ret));
+      }
     }
   }
 }
@@ -220,31 +220,31 @@ void ObTestbenchTransactionScheduler::generate_contention_txn_task() {
 void ObTestbenchTransactionScheduler::generate_deadlock_txn_task() {
   int ret = OB_SUCCESS;
   ObDeadlockTransactionOptions *options = static_cast<ObDeadlockTransactionOptions*>(workload_options_);
-  int64_t partitions = options->get_partitions();
-  int64_t concurrency = options->get_concurrency();
-  int64_t chains = options->get_chains();
   Parameters partition_ids;
   if (OB_ISNULL(options)) {
     ret = OB_ERR_UNEXPECTED;
     TESTBENCH_LOG(ERROR, "cast ObIWorkloadOptions to ObDeadlockTransactionOptions failed", KR(ret), KP(workload_options_));
-  } else if (OB_FAIL(location_cache_.generate_different_partitions(partitions, partition_ids))) {
-    TESTBENCH_LOG(ERROR, "generate distinct partitions failed", KR(ret), "target", partitions);
-  }
-
-  if (OB_SUCC(ret)) {
-    ObDeadlockTransactionTask *task = nullptr;
-    void *buf = nullptr;
-    BasicTaskConfig config{ table_name_, concurrency, statistics_collector_, dblink_ids_.at(cur_conn_id_), mysql_proxy_, partition_ids, cur_row_id_ };
-    cur_conn_id_ = (cur_conn_id_ + 1) % dblink_ids_.count();
-    cur_row_id_ = (cur_row_id_ + concurrency * chains) % dataset_options_->get_rows();
-    if (OB_ISNULL(buf = allocator_.alloc(sizeof(ObDeadlockTransactionTask)))) {
-      ret = OB_ALLOCATE_MEMORY_FAILED;
-      TESTBENCH_LOG(ERROR, "allocate memory failed", KR(ret));
-    } else if (OB_ISNULL(task = new(buf)ObDeadlockTransactionTask(config, chains))) {
-      ret = OB_ERR_UNEXPECTED;
-      TESTBENCH_LOG(ERROR, "create new deadlock transaction task failed", KR(ret));
-    } else if (OB_FAIL(executor_pool_->push_task(task))) {
-      TESTBENCH_LOG(ERROR, "push new deadlock transaction task failed", KR(ret));
+  } else  {
+    int64_t partitions = options->get_partitions();
+    int64_t concurrency = options->get_concurrency();
+    int64_t chains = options->get_chains();
+    if (OB_FAIL(location_cache_.generate_different_partitions(partitions, partition_ids))) {
+      TESTBENCH_LOG(ERROR, "generate distinct partitions failed", KR(ret), "target", partitions);
+    } else {
+      ObDeadlockTransactionTask *task = nullptr;
+      void *buf = nullptr;
+      BasicTaskConfig config{ table_name_, concurrency, statistics_collector_, dblink_ids_.at(cur_conn_id_), mysql_proxy_, partition_ids, cur_row_id_ };
+      cur_conn_id_ = (cur_conn_id_ + 1) % dblink_ids_.count();
+      cur_row_id_ = (cur_row_id_ + concurrency * chains) % dataset_options_->get_rows();
+      if (OB_ISNULL(buf = allocator_.alloc(sizeof(ObDeadlockTransactionTask)))) {
+        ret = OB_ALLOCATE_MEMORY_FAILED;
+        TESTBENCH_LOG(ERROR, "allocate memory failed", KR(ret));
+      } else if (OB_ISNULL(task = new(buf)ObDeadlockTransactionTask(config, chains))) {
+        ret = OB_ERR_UNEXPECTED;
+        TESTBENCH_LOG(ERROR, "create new deadlock transaction task failed", KR(ret));
+      } else if (OB_FAIL(executor_pool_->push_task(task))) {
+        TESTBENCH_LOG(ERROR, "push new deadlock transaction task failed", KR(ret));
+      }
     }
   }
 }

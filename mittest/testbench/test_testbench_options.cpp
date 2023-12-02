@@ -22,7 +22,7 @@ public:
     "-t", "5",
     "-c", "host=127.0.0.1,user=root@tb,port=2881,database=test,table=testbench",
     "-d", "partitions=9,rows=10000",
-    "-s", "capacity=500,minimum=10,maximum=80",
+    "-s", "capacity=500,minimum=10,maximum=80,threads=1,tasks=99999",
     "-T", "threads=50,tasks=100,participants=1,operations=10",
     "-C", "threads=50,tasks=100,concurrency=1,operations=10,aborts=0",
     "-D", "threads=50,tasks=100,concurrency=2,chains=2"
@@ -54,6 +54,8 @@ TEST_F(TestOptionsParser, parse_all_options) {
   EXPECT_EQ(500, opts.statistics_opts_->get_bucket_capacity());
   EXPECT_EQ(10, opts.statistics_opts_->get_bucket_min_percentage());
   EXPECT_EQ(80, opts.statistics_opts_->get_bucket_max_percentage());
+  EXPECT_EQ(1, opts.statistics_opts_->get_thread_num());
+  EXPECT_EQ(99999, opts.statistics_opts_->get_task_queue_limit());
   ObDistributedTransactionOptions *dtxn_opts = static_cast<ObDistributedTransactionOptions*>(opts.workloads_opts_.at(0));
   ObContentionTransactionOptions *contention_opts = static_cast<ObContentionTransactionOptions*>(opts.workloads_opts_.at(1));
   ObDeadlockTransactionOptions *deadlock_opts = static_cast<ObDeadlockTransactionOptions*>(opts.workloads_opts_.at(2));

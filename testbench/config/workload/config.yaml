@@ -10,6 +10,8 @@ instance_testbench:
     capacity: 500
     minimum: 10
     maximum: 80
+    threads: 1
+    tasks: 99999
   connection:
     # for connection parameters
     host: 127.0.0.1

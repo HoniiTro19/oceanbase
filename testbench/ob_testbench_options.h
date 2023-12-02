@@ -126,11 +126,16 @@ namespace oceanbase
       inline int64_t get_bucket_capacity() { return bucket_capacity_; }
       inline int64_t get_bucket_min_percentage() { return bucket_min_percentage_; }
       inline int64_t get_bucket_max_percentage() { return bucket_max_percentage_; }
+      inline int64_t get_thread_num() { return thread_num_; }
+      inline int64_t get_task_queue_limit() { return task_queue_limit_; }
+      INHERIT_TO_STRING_KV("ObIOptions", ObIOptions, K_(bucket_capacity), K_(bucket_min_percentage), K_(bucket_max_percentage), K_(thread_num), K_(task_queue_limit));
 
     private:
       int64_t bucket_capacity_;
       int64_t bucket_min_percentage_;
       int64_t bucket_max_percentage_;
+      int64_t thread_num_;
+      int64_t task_queue_limit_;
     };
 
     class ObConnectionOptions : public ObIOptions
@@ -145,6 +150,7 @@ namespace oceanbase
       inline const char *get_cluster_pass() { return cluster_pass_; }
       inline const char *get_cluster_db_name() { return cluster_db_name_; }
       inline const char *get_cluster_table_name() { return cluster_table_name_; }
+      INHERIT_TO_STRING_KV("ObIOptions", ObIOptions, KCSTRING_(cluster_host), KCSTRING_(cluster_user), K_(cluster_port), KCSTRING_(cluster_pass), KCSTRING_(cluster_db_name), KCSTRING_(cluster_table_name));
     
     private:
       char cluster_host_[OB_MAX_HOST_NAME_LENGTH];

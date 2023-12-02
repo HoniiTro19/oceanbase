@@ -257,7 +257,9 @@ ObStatisticsCollectorOptions::ObStatisticsCollectorOptions(const char *opt_str)
   : ObIOptions(opt_str),
     bucket_capacity_(500),
     bucket_min_percentage_(10),
-    bucket_max_percentage_(80)
+    bucket_max_percentage_(80),
+    thread_num_(1),
+    task_queue_limit_(99999)
 {}
 
 ObStatisticsCollectorOptions::~ObStatisticsCollectorOptions() {}
@@ -284,6 +286,12 @@ int ObStatisticsCollectorOptions::fill_options(const char *key, const char *valu
       break;
     case StatisticsOptions::MINIMUM:
       bucket_min_percentage_ = atoi(value);
+      break;
+    case StatisticsOptions::THREADS:
+      thread_num_ = atoi(value);
+      break;
+    case StatisticsOptions::TASKS:
+      task_queue_limit_ = atoi(value);
       break;
     default:
       ret = OB_INVALID_ARGUMENT;

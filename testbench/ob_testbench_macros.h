@@ -86,6 +86,8 @@ namespace testbench
   X(CAPACITY, "capacity")                    \
   X(MINIMUM, "minimum")                      \
   X(MAXIMUM, "maximum")                      \
+  X(THREADS, "threads")                      \
+  X(TASKS, "tasks")                          \
   X(END, "end")
 
 // connection options macros

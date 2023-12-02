@@ -168,6 +168,8 @@ void ObStatisticsQueueTask::set_histogram_inited() {
 */
 ObTestbenchStatisticsCollector::ObTestbenchStatisticsCollector()
   : is_inited_(false),
+    thread_num_(1),
+    task_queue_limit_(99999),
     snapshot_ready_(0),
     submit_(),
     submit_queues_{},
@@ -177,17 +179,18 @@ ObTestbenchStatisticsCollector::ObTestbenchStatisticsCollector()
 
 ObTestbenchStatisticsCollector::~ObTestbenchStatisticsCollector() {}
 
-int ObTestbenchStatisticsCollector::init(int64_t bucket_capacity, double_t bucket_min_ratio, double_t bucket_max_ratio) {
+int ObTestbenchStatisticsCollector::init(ObStatisticsCollectorOptions *opts) {
   int ret = OB_SUCCESS;
-  bucket_capacity_ = bucket_capacity;
-  bucket_min_ratio_ = bucket_min_ratio;
-  bucket_max_ratio_ = bucket_max_ratio;
   if (IS_INIT) {
     ret = OB_INIT_TWICE;
     TESTBENCH_LOG(WARN, "statistics collector has already been inited", K(ret));
+  } else if (OB_ISNULL(opts)) {
+    ret = OB_ERR_UNEXPECTED;
+    TESTBENCH_LOG(ERROR, "statistics collector options are not inited", KR(ret));
   } else if (OB_FAIL(submit_.init())) {
     TESTBENCH_LOG(ERROR, "statistics submit task init failed", K(ret));
   } else {
+    bucket_capacity_ = opts->get_bucket_capacity();
     for (int64_t i = 0; OB_SUCC(ret) && i < TASK_QUEUE_SIZE; ++i) {
       if (OB_FAIL(submit_queues_[i].init(i))) {
         TESTBENCH_LOG(ERROR, "statistics submit queue task init failed", K(ret), K(i));
@@ -199,6 +202,10 @@ int ObTestbenchStatisticsCollector::init(int64_t bucket_capacity, double_t bucke
     }
   }
   if (OB_SUCC(ret)) {
+    bucket_min_ratio_ = (double)opts->get_bucket_min_percentage() / 100.0;
+    bucket_max_ratio_ = (double)opts->get_bucket_max_percentage() / 100.0;
+    thread_num_ = opts->get_thread_num();
+    task_queue_limit_ = opts->get_task_queue_limit();
     is_inited_ = true;
   }
   return ret;
@@ -213,6 +220,10 @@ int ObTestbenchStatisticsCollector::start() {
     TESTBENCH_LOG(ERROR, "statistics collector create threadpool failed", K(ret), K(tg_id_));
   } else if (OB_FAIL(TG_SET_HANDLER_AND_START(tg_id_, *this))) {
     TESTBENCH_LOG(ERROR, "start statistics collector failed", K(tg_id_), K(ret));
+  } else if (OB_FAIL(TG_SET_THREAD_CNT(tg_id_, thread_num_))) {
+    TESTBENCH_LOG(WARN, "set ObTestbenchStatisticsCollector thread cnt fail", KR(ret), K_(thread_num));
+  } else if (OB_FAIL(TG_SET_QUEUE_SIZE(tg_id_, task_queue_limit_))) {
+    TESTBENCH_LOG(WARN, "set ObTestbenchStatisticsCollector queue size fail", KR(ret), K_(task_queue_limit));
   } else {
     TESTBENCH_LOG(INFO, "start statistics collector succeed", K(tg_id_), K(ret));
   }

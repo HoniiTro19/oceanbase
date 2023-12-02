@@ -20,6 +20,7 @@
 #include "common/object/ob_object.h"
 #include "lib/allocator/page_arena.h"
 #include "lib/thread/thread_mgr.h"
+#include "testbench/ob_testbench_options.h"
 
 namespace oceanbase {
 namespace testbench {
@@ -37,8 +38,7 @@ enum ObLatencyTaskType {
   LATENCY_TASK_TYPE_CNT
 };
 
-// const int64_t TASK_QUEUE_SIZE = ObLatencyTaskType::LATENCY_TASK_TYPE_CNT;
-const int64_t TASK_QUEUE_SIZE = 8;
+const int64_t TASK_QUEUE_SIZE = ObLatencyTaskType::LATENCY_TASK_TYPE_CNT;
 
 class ObLatencyTask {
 public:
@@ -127,7 +127,7 @@ public:
   ~ObTestbenchStatisticsCollector();
 
 public:
-  int init(int64_t bucket_capacity, double_t bucket_min_ratio, double_t bucket_max_ratio);
+  int init(ObStatisticsCollectorOptions *opts);
   int start();
   void stop();
   void wait();
@@ -153,6 +153,8 @@ public:
 private:
   int tg_id_;
   bool is_inited_;
+  int64_t thread_num_;
+  int64_t task_queue_limit_;
   int64_t snapshot_ready_;
   int64_t bucket_capacity_;
   double_t bucket_min_ratio_;
