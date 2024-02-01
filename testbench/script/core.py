@@ -87,7 +87,7 @@ class TestBench(object):
 
     def _create_workspace(self):
         def mkdir_workspace(name, server):
-            if not DirectoryUtil.mkdir(server.get_conf("work_space")):
+            if not DirectoryUtil.mkdir(server.get_conf("work_space"), 0o755, self.stdio):
                 self.stdio.error(
                     "Fail to make work space directory for {}".format(name)
                 )
