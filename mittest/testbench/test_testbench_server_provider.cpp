@@ -59,5 +59,6 @@ TEST_F(TestServerProvider, refresh) {
 int main(int argc, char **argv) {
   ::testing::InitGoogleTest(&argc, argv);
   OB_LOGGER.set_log_level("INFO");
+  OB_LOGGER.set_file_name("test_testbench_server_provider.log", true, false);
   return RUN_ALL_TESTS();
 }

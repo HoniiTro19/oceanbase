@@ -251,5 +251,6 @@ TEST_F(TestAsyncOperation, async_write_performance) {
 int main(int argc, char **argv) {
   ::testing::InitGoogleTest(&argc, argv);
   OB_LOGGER.set_log_level("INFO");
+  OB_LOGGER.set_file_name("test_async_operation.log", true, false);
   return RUN_ALL_TESTS();
 }

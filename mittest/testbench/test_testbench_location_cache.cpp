@@ -46,5 +46,6 @@ TEST_F(TestTestbenchLocationCache, generate_partitions) {
 int main(int argc, char **argv) {
   ::testing::InitGoogleTest(&argc, argv);
   OB_LOGGER.set_log_level("INFO");
+  OB_LOGGER.set_file_name("test_testbench_location_cache.log", true, false);
   return RUN_ALL_TESTS();
 }

@@ -93,5 +93,6 @@ TEST_F(TestStatisticsCollector, concurrent_push) {
 int main(int argc, char **argv) {
   ::testing::InitGoogleTest(&argc, argv);
   OB_LOGGER.set_log_level("INFO");
+  OB_LOGGER.set_file_name("test_testbench_statistics_collector.log", true, false);
   return RUN_ALL_TESTS();
 }
