@@ -74,12 +74,14 @@ TEST_F(TestTransactionTask, distributed_transaction) {
       // ensure there are at least 50 partitions numbered from 1 to 50 in the database
       partition_ids.push_back(random.rand(1, 50));
     }
-    BasicTaskConfig config{ table_name, 3, &statistics_collector, dblink_id, &mysql_proxy, partition_ids, i * 10};
+    BasicTaskConfig config{ table_name, 3, &statistics_collector, dblink_id, &mysql_proxy, partition_ids, i * 40};
     ObDistributedTransactionTask distributed_transaction_task(config, 2, 10);
     ASSERT_EQ(OB_SUCCESS, distributed_transaction_task.init());
+    TESTBENCH_LOG(TRACE, "distributed_transaction_task init", "index", i);
     ASSERT_EQ(OB_SUCCESS, distributed_transaction_task.execute_transactions());
+        TESTBENCH_LOG(TRACE, "distributed_transaction_task execute_transactions", "index", i);
     ASSERT_EQ(OB_SUCCESS, distributed_transaction_task.release_dblinks());
-    TESTBENCH_LOG(DEBUG, "execute distributed transaction succeed", "index", i);
+    TESTBENCH_LOG(TRACE, "execute distributed transaction succeed", "index", i);
   }
 }
 
@@ -91,9 +93,11 @@ TEST_F(TestTransactionTask, contention_transaction) {
     BasicTaskConfig config { table_name, 1, &statistics_collector, dblink_id, &mysql_proxy, partition_ids, i * 20};
     ObContentionTransactionTask contention_transaction_task(config, 0, 10);
     ASSERT_EQ(OB_SUCCESS, contention_transaction_task.init());
+    TESTBENCH_LOG(TRACE, "contention_transaction init", "index", i);
     ASSERT_EQ(OB_SUCCESS, contention_transaction_task.execute_transactions());
+    TESTBENCH_LOG(TRACE, "contention_transaction execute_transactions", "index", i);
     ASSERT_EQ(OB_SUCCESS, contention_transaction_task.release_dblinks());
-    TESTBENCH_LOG(DEBUG, "execute contention_transaction succeed", "index", i);
+    TESTBENCH_LOG(TRACE, "execute contention_transaction succeed", "index", i);
   }
 }
 
@@ -105,7 +109,9 @@ TEST_F(TestTransactionTask, deadlock_transaction) {
 
 int main(int argc, char **argv) {
   ::testing::InitGoogleTest(&argc, argv);
+  const char *file_name = "test_testbench_transaction_task.log";
   OB_LOGGER.set_log_level("INFO");
-  OB_LOGGER.set_file_name("test_testbench_transaction_task.log", true, false);
+  remove(file_name);
+  OB_LOGGER.set_file_name(file_name, false, false);
   return RUN_ALL_TESTS();
 }

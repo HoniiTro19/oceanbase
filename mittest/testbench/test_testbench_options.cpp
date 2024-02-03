@@ -81,7 +81,9 @@ TEST_F(TestOptionsParser, parse_all_options) {
 
 int main(int argc, char **argv) {
   ::testing::InitGoogleTest(&argc, argv);
+  const char *file_name = "test_testbench_options.log";
   OB_LOGGER.set_log_level("INFO");
-  OB_LOGGER.set_file_name("test_testbench_options.log", true, false);
+  remove(file_name);
+  OB_LOGGER.set_file_name(file_name, true, false);
   return RUN_ALL_TESTS();
 }
