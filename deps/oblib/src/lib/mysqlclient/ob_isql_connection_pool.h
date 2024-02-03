@@ -37,6 +37,7 @@ struct ObConnPoolConfigParam
   int64_t connection_pool_warn_time_;   // us
   int64_t long_query_timeout_;          // us
   int64_t sqlclient_per_observer_conn_limit_;
+  int64_t trx_timeout_;                 // us
 };
 namespace sqlclient
 {

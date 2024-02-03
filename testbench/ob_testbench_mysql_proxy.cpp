@@ -66,6 +66,7 @@ int ObTestbenchMySQLProxy::set_server_provider_param(const common::ObAddr &addr)
   conn_pool_config_.connection_pool_warn_time_ = 60L * 1000L * 1000L;         // us
   conn_pool_config_.long_query_timeout_ = sql_query_timeout_us;               // us
   conn_pool_config_.sqlclient_per_observer_conn_limit_ = 500;                 // @todo as param
+  conn_pool_config_.trx_timeout_ = 100L * 1000L * 1000L;                      // us
   if (OB_FAIL(mysql_config_.reset(addr, "root@sys", "", "oceanbase", sql_conn_timeout_us / 1000000L, sql_query_timeout_us / 1000000L))) {
     TESTBENCH_LOG(WARN, "set server provider parameters failed", KR(ret), K(addr));
   }

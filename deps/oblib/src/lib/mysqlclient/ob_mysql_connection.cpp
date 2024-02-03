@@ -454,10 +454,15 @@ int ObMySQLConnection::set_timeout_variable(const int64_t query_timeout, const i
       if (OB_UNLIKELY(w_len <= 0) || OB_UNLIKELY(w_len >= OB_MAX_SQL_LENGTH)) {
         ret = OB_ERR_UNEXPECTED;
         LOG_WARN("fill sql string error", K(ret));
-      } else if (OB_FAIL(create_statement(stmt, OB_SYS_TENANT_ID, sql))) {
-        LOG_WARN("create statement failed", K(ret));
+      } else if (OB_FAIL(stmt.init(*this, sql))) {
+        LOG_WARN("init timeout statement failed", K(ret), K(sql));
+      // avoid using sys tenant id when setting session timeout variable
+      // } else if (OB_FAIL(create_statement(stmt, OB_SYS_TENANT_ID, sql))) {
+      //   LOG_WARN("create statement failed", K(ret));
       } else if (OB_FAIL(stmt.execute_update(affect_rows))) {
         LOG_WARN("execute sql failed", K(get_server()), KCSTRING(sql), K(ret));
+      } else {
+        LOG_TRACE("set timeout variable succeed", K(query_timeout), K(trx_timeout));
       }
     }
   }
