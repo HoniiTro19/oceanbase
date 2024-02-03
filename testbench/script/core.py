@@ -397,14 +397,14 @@ class TestBench(object):
             return False
         return self.dataset_manager.generate_dataset()
     
-    def _clear_schema(self):
+    def clear_schema(self):
         rs = self.cluster_manager.root_service
         cursor = MySQLClient.connect(rs, user="root@{}".format(self._tenant_name), database=self._database_name, stdio=self.stdio)
         if not cursor:
             self.stdio.error("Fail to get database connection.")
             return False
-        rm_table_sql = 'DROP TABLE {} IF EXISTS'.format(self._table_name)
-        rm_tg_sql = 'DROP TABLEGROUP {} IF EXISTS'.format(self._tg_name)
+        rm_table_sql = 'DROP TABLE IF EXISTS {}'.format(self._table_name)
+        rm_tg_sql = 'DROP TABLEGROUP IF EXISTS {}'.format(self._tg_name)
         try:
             self.stdio.verbose("drop table - {}".format(rm_table_sql))
             result = cursor.execute(rm_table_sql)

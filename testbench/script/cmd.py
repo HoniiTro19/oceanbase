@@ -424,6 +424,7 @@ class BenchLoadCommand(TestBenchCommand):
 
     def _do_command(self, tb):
         self._do_step("Generating datasets for the benchmark table.", tb.generate_dataset)
+        self._do_step("Clearing schemas for the benchmark table.", tb.clear_schema)
         self._do_step("Creating schemas for the benchmark table.", tb.generate_schema)
         self._do_step("Loading datasets into the benchmark table.", tb.load_dataset)
         
