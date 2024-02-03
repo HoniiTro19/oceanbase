@@ -30,12 +30,13 @@ namespace oceanbase
     typedef ObArrayWrap<int64_t> Latencys;
     typedef ObArrayWrap<bool> Commits;
     typedef ObArray<int64_t> Parameters;
+    typedef ObArray<uint64_t> Dblinks;
 
     struct BasicTaskConfig {
       const char *table_name;
       int64_t connections;
       ObTestbenchStatisticsCollector *collector;
-      uint64_t dblink_id;
+      Dblinks dblink_id;
       ObTestbenchMySQLProxy *mysql_proxy;
       Parameters partition_id;
       int64_t row_id_start;
@@ -64,7 +65,7 @@ namespace oceanbase
       Connections connections_;
       ObTestbenchMySQLProxy *mysql_proxy_;
       ObTestbenchStatisticsCollector *latency_collector_;
-      uint64_t dblink_id_;
+      Dblinks dblink_id_;
       Parameters partition_id_;
       int64_t row_id_start_;
       Latencys latencys_;
