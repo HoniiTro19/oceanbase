@@ -495,6 +495,11 @@ class TestBench(object):
             if result != 0:
                 self.stdio.error("Fail to grant user.")
                 return False
+            # refresh connection
+            cursor = MySQLClient.connect(rs, user="root@{}".format(self._tenant_name), database=self._database_name, stdio=self.stdio)
+            if not cursor:
+                self.stdio.error("Fail to get tenant database connection.")
+                return False
             self.stdio.verbose("set timeout - {}".format(set_timeout_sql))
             result = cursor.execute(set_timeout_sql)
             if result != 0:
