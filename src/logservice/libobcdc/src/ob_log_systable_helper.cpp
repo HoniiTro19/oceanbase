@@ -249,7 +249,7 @@ int QueryPartitionInfoStrategy::build_sql_statement(
     ret = OB_INVALID_ARGUMENT;
     LOG_ERROR("invalid argument", KR(ret), K(sql_buf), K(mul_statement_buf_len));
   } else if (OB_FAIL(databuff_printf(sql_buf, mul_statement_buf_len, pos, 
-    "SELECT SVR_IP, PARTITION_NAME FROM CDB_OB_TABLE_LOCATIONS WHERE DATABASE_NAME = '%s' AND TABLE_NAME = '%s' AND ROLE = 'LEADER'",
+    "SELECT concat(concat(SVR_IP, ':'), SVR_PORT), PARTITION_NAME FROM CDB_OB_TABLE_LOCATIONS WHERE DATABASE_NAME = '%s' AND TABLE_NAME = '%s' AND ROLE = 'LEADER'",
       database_name_, table_name_))) {
     LOG_ERROR("build_sql_statement failed for query partition_info", KR(ret), K(pos), KCSTRING(sql_buf));
   }
