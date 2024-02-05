@@ -31,7 +31,8 @@ public:
   void destroy();
   int refresh_locations();
   int generate_different_partitions(int64_t target, Parameters &parameters);
-  inline int get_svr_count() { return svr_ips_.count(); }
+  int generate_random_partition(const ObString &svr_ip, int64_t &parameter);
+  common::ObArray<ObString> &get_svr_ips();
 
 private:
   bool is_inited_;

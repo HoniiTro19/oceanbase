@@ -54,6 +54,7 @@ int ObTestbenchLocationCache::refresh_locations() {
   } else {
     auto bucket_iter = partition_info_.begin();
     while (bucket_iter != partition_info_.end()) {
+      TESTBENCH_LOG(TRACE, "check partition info after refresh locations", "svr_ip", bucket_iter->first, "partitions", bucket_iter->second->count());
       if (OB_FAIL(svr_ips_.push_back(bucket_iter->first))) {
         TESTBENCH_LOG(ERROR, "push server ip into svr_ips from link hash map failed", K(ret));
       }
@@ -63,7 +64,6 @@ int ObTestbenchLocationCache::refresh_locations() {
   return ret;
 }
 
-// TODO generate partitions according to server id
 int ObTestbenchLocationCache::generate_different_partitions(int64_t target, Parameters &parameters) {
   int ret = OB_SUCCESS;
   int64_t svr_count = svr_ips_.count();
@@ -89,8 +89,31 @@ int ObTestbenchLocationCache::generate_different_partitions(int64_t target, Para
         }
       }
     }
+    TESTBENCH_LOG(TRACE, "generate different partitions", "partitions", parameters);
   }
   return ret;
+}
+
+int ObTestbenchLocationCache::generate_random_partition(const ObString &svr_ip, int64_t &parameter) {
+  int ret = OB_SUCCESS;
+  int64_t svr_count = svr_ips_.count();
+  PartitionList *partition_ids = nullptr;
+  if (OB_FAIL(partition_info_.get_refactored(svr_ip, partition_ids))) {
+    TESTBENCH_LOG(ERROR, "get partition ids from partition info failed", KR(ret));
+  } else if (OB_ISNULL(partition_ids)) {
+    ret = OB_ERR_UNEXPECTED;
+    TESTBENCH_LOG(ERROR, "get empty partition id list", KR(ret));
+  } else {
+    int64_t partition_count = partition_ids->count();
+    int64_t sample_idx = random_.rand(0, partition_count - 1);
+    parameter = partition_ids->at(sample_idx);
+    TESTBENCH_LOG(TRACE, "generate random partition", "partition", parameter);
+  }
+  return ret;
+}
+
+common::ObArray<ObString> &ObTestbenchLocationCache::get_svr_ips() {
+  return svr_ips_;
 }
 } // namespace testbench
 } // namespace oceanbase
