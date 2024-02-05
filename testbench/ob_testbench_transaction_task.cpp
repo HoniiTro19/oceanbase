@@ -81,10 +81,10 @@ int ObIWorkloadTransactionTask::init() {
 
 int ObIWorkloadTransactionTask::wait_for_connection(ObMySQLConnection *conn) {
   int ret = OB_SUCCESS;
-  while (OB_FAIL(conn->get_conn_status())) {
-    if (OB_UNLIKELY(OB_NEED_RETRY != ret)) {
-      return ret;
-    }
+  if (OB_FAIL(conn->get_conn_status())) {
+    TESTBENCH_LOG(ERROR, "get connection status failed", KR(ret));
+  } else if (OB_FAIL(conn->update_conn_status())) {
+    TESTBENCH_LOG(ERROR, "update connection status failed", KR(ret));
   }
   return ret;
 }
@@ -171,12 +171,10 @@ int ObDistributedTransactionTask::execute_transactions() {
       TESTBENCH_LOG(WARN, "start transaction async failed", K(ret));
       commits_.at(conn_idx) = false;
     }
-    TESTBENCH_LOG(TRACE, "start distributed transaction", KR(ret), K(conn_idx));
   }
   // execute commands
   for (int64_t i = 0; i < operations_; ++i) {
     for (int64_t conn_idx = 0; OB_SUCC(ret) && conn_idx < connection_count_; ++conn_idx) {
-      TESTBENCH_LOG(TRACE, "execute wait for the connection", KR(ret), "operation", i, K(conn_idx));
       ObMySQLPreparedStatement &stmt = lock_txn_stmts_.at(conn_idx);
       if (OB_FAIL(wait_and_bind_param(conn_idx, partition_id_.at(current_partition_idx), current_row_id, stmt))) {
         TESTBENCH_LOG(WARN, "wait and bind parameters failed", K(ret));
@@ -189,12 +187,10 @@ int ObDistributedTransactionTask::execute_transactions() {
       if (OB_FAIL(ret)) {
         commits_.at(conn_idx) = false;
       }
-      TESTBENCH_LOG(TRACE, "execute distributed transaction", KR(ret), "operation", i, K(conn_idx), "partition", partition_id_.at(current_partition_idx), "row", current_row_id);
     }
   }
   // always commit or rollback transactions
   for (int64_t conn_idx = 0; OB_SUCC(ret) && conn_idx < connection_count_; ++conn_idx) {
-    TESTBENCH_LOG(TRACE, "commit wait for the connection", KR(ret), K(conn_idx));
     if (OB_FAIL(wait_for_connection(connections_.at(conn_idx)))) {
       TESTBENCH_LOG(WARN, "wait for the connection get error", K(ret));
     } else {
@@ -206,11 +202,9 @@ int ObDistributedTransactionTask::execute_transactions() {
     if (OB_FAIL(ret)) {
       commits_.at(conn_idx) = false;
     }
-    TESTBENCH_LOG(TRACE, "execute distributed transaction", KR(ret), K(conn_idx));
   }
   // collect statistics
   for (int64_t conn_idx = 0; OB_SUCC(ret) && conn_idx < connection_count_; ++conn_idx) {
-    TESTBENCH_LOG(TRACE, "collect wait for the connection", KR(ret), K(conn_idx));
     if (OB_FAIL(wait_for_connection(connections_.at(conn_idx)))) {
       TESTBENCH_LOG(WARN, "wait for the connection get error", K(ret));
       commits_.at(conn_idx) = false;
@@ -226,10 +220,9 @@ int ObDistributedTransactionTask::execute_transactions() {
       } else if (OB_FAIL(record_latency(ObLatencyTaskType::DISTRIBUTED_TXN_LATENCY_TASK, cumulative_latencys_.at(conn_idx)))) {
         TESTBENCH_LOG(WARN, "record the latency of distributed transaction failed", KR(ret), "txn_latency", cumulative_latencys_.at(conn_idx));
       } else {
-        TESTBENCH_LOG(DEBUG, "distributed transaction commit success", "commit_latency", latencys_.at(conn_idx), "txn_latency", cumulative_latencys_.at(conn_idx));
+        TESTBENCH_LOG(TRACE, "distributed transaction commit success", "commit_latency", latencys_.at(conn_idx), "txn_latency", cumulative_latencys_.at(conn_idx));
       }
     }
-    TESTBENCH_LOG(TRACE, "collect distributed transaction", KR(ret), K(conn_idx));
   }
   return ret;
 }
@@ -318,7 +311,6 @@ int ObContentionTransactionTask::execute_transactions() {
   }
   // commit transactions
   for (int64_t conn_idx = aborts; OB_SUCC(ret) && conn_idx < connection_count_; ++conn_idx) {
-    TESTBENCH_LOG(TRACE, "commit wait for the connection", KR(ret));
     if (OB_FAIL(wait_for_connection(connections_.at(conn_idx)))) {
       TESTBENCH_LOG(WARN, "wait for the connection get error", K(ret));
     } else {
@@ -330,7 +322,6 @@ int ObContentionTransactionTask::execute_transactions() {
   }
   // collect statistics
   for (int64_t conn_idx = 0; OB_SUCC(ret) && conn_idx < connection_count_; ++conn_idx) {
-    TESTBENCH_LOG(TRACE, "collect wait for the connection", KR(ret));
     if (OB_FAIL(wait_for_connection(connections_.at(conn_idx)))) {
       TESTBENCH_LOG(WARN, "wait for the connection get error", K(ret));
       commits_.at(conn_idx) = false;
@@ -345,7 +336,7 @@ int ObContentionTransactionTask::execute_transactions() {
       } else if (OB_FAIL(record_latency(ObLatencyTaskType::CONTENTION_TXN_LATENCY_TASK, latencys_.at(conn_idx)))) {
         TESTBENCH_LOG(WARN, "record the latency of contention transaction failed", KR(ret), "txn_latency", cumulative_latencys_.at(conn_idx));
       } else {
-        TESTBENCH_LOG(DEBUG, "contention transaction commit success", "lock_latency", latencys_.at(conn_idx), "txn_latency", cumulative_latencys_.at(conn_idx));
+        TESTBENCH_LOG(TRACE, "contention transaction commit success", "lock_latency", latencys_.at(conn_idx), "txn_latency", cumulative_latencys_.at(conn_idx));
       }
     }
   }

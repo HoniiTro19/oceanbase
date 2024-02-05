@@ -66,7 +66,7 @@ TEST_F(TestTransactionTask, distributed_transaction) {
   int64_t transaction_count = 1000;
   Dblinks dblink_array;
   int64_t count = server_array.count();
-  int64_t connections = 10;
+  int64_t connections = 50;
   for (int i = 0; i < connections; ++i) {
     dblink_array.push_back(DblinkKey(tenant_name_str, server_array[i % count]).hash());
   }
@@ -120,7 +120,7 @@ TEST_F(TestTransactionTask, deadlock_transaction) {
 int main(int argc, char **argv) {
   ::testing::InitGoogleTest(&argc, argv);
   const char *file_name = "test_testbench_transaction_task.log";
-  OB_LOGGER.set_log_level("DEBUG");
+  OB_LOGGER.set_log_level("INFO");
   remove(file_name);
   OB_LOGGER.set_file_name(file_name, false, false);
   return RUN_ALL_TESTS();

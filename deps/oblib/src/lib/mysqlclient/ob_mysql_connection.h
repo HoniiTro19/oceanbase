@@ -123,6 +123,7 @@ public:
   int rollback_async();
   int commit_async();
   int get_conn_status();
+  int update_conn_status();
 
   // session environment
   virtual int get_session_variable(const ObString &name, int64_t &val) override;
@@ -215,10 +216,12 @@ class ObContFunc {
 public:
   ObContFunc(ObMySQLConnection *conn) : conn_(conn) {}
   virtual ~ObContFunc() {}
-  virtual int run_func() = 0;
-  int update_begin_status();
-  int update_commit_status();
+  virtual void run_func() = 0;
+  virtual int update_status() = 0;
+  int update_bool_status();
+  int update_int_status();
   int update_stmt_status();
+  int update_mysql_status();
 
 protected:
   ObMySQLConnection *conn_;
@@ -229,56 +232,56 @@ class ObConnectContFunc : public ObContFunc {
 public:
   ObConnectContFunc(ObMySQLConnection *conn) : ObContFunc(conn) {}
   virtual ~ObConnectContFunc() {}
-  virtual int run_func() override;
+  virtual void run_func() override;
+  virtual int update_status() override;
 };
 
 class ObQueryContFunc : public ObContFunc {
 public:
   ObQueryContFunc(ObMySQLConnection *conn) : ObContFunc(conn) {}
   virtual ~ObQueryContFunc() {}
-  virtual int run_func() override;
-};
-
-class ObUpdateContFunc : public ObContFunc {
-public:
-  ObUpdateContFunc(ObMySQLConnection *conn) : ObContFunc(conn) {}
-  virtual ~ObUpdateContFunc() {}
-  virtual int run_func() override;
+  virtual void run_func() override;
+  virtual int update_status() override;
 };
 
 class ObStmtQueryContFunc : public ObContFunc {
 public:
   ObStmtQueryContFunc(ObMySQLConnection *conn) : ObContFunc(conn) {}
   virtual ~ObStmtQueryContFunc() {}
-  virtual int run_func() override;
+  virtual void run_func() override;
+  virtual int update_status() override;
 };
 
 class ObStmtUpdateContFunc : public ObContFunc {
 public:
   ObStmtUpdateContFunc(ObMySQLConnection *conn) : ObContFunc(conn) {}
   virtual ~ObStmtUpdateContFunc() {}
-  virtual int run_func() override;
+  virtual void run_func() override;
+  virtual int update_status() override;
 };
 
 class ObStartContFunc : public ObContFunc {
 public:
   ObStartContFunc(ObMySQLConnection *conn) : ObContFunc(conn) {}
   virtual ~ObStartContFunc() {}
-  virtual int run_func() override;
+  virtual void run_func() override;
+  virtual int update_status() override;
 };
 
 class ObCommitContFunc : public ObContFunc {
 public:
   ObCommitContFunc(ObMySQLConnection *conn) : ObContFunc(conn) {}
   virtual ~ObCommitContFunc() {}
-  virtual int run_func() override;
+  virtual void run_func() override;
+  virtual int update_status() override;
 };
 
 class ObRollbackContFunc : public ObContFunc {
 public:
   ObRollbackContFunc(ObMySQLConnection *conn) : ObContFunc(conn) {}
   virtual ~ObRollbackContFunc() {}
-  virtual int run_func() override;
+  virtual void run_func() override;
+  virtual int update_status() override;
 };
 } // namespace sqlclient
 } // namespace common
