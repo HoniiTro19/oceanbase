@@ -81,7 +81,7 @@ int ObIWorkloadTransactionTask::init() {
 
 int ObIWorkloadTransactionTask::wait_for_connection(ObMySQLConnection *conn) {
   int ret = OB_SUCCESS;
-  if (OB_FAIL(conn->get_conn_status())) {
+  if (OB_FAIL(TIMER_RET("wait for connection async status change", conn->get_conn_status()))) {
     TESTBENCH_LOG(ERROR, "get connection status failed", KR(ret));
   } else if (OB_FAIL(conn->update_conn_status())) {
     TESTBENCH_LOG(ERROR, "update connection status failed", KR(ret));

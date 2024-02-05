@@ -140,6 +140,23 @@ namespace testbench
   const char *const statistics_opts[] = { STATISTICS_OPTIONS };
   const char *const connection_opts[] = { CONNECTION_OPTIONS };
 #undef X
+
+/*
+                                          code segment timer macros
+*/
+
+#define TIMER(name, seg)                                            \
+  int64_t begin_time = common::ObTimeUtility::current_time();       \
+  seg;                                                              \
+  int64_t end_time = common::ObTimeUtility::current_time();         \
+  TESTBENCH_LOG(TRACE, name, "time", end_time - begin_time);        \
+
+#define TIMER_RET(name, seg)                                        \
+  {                                                                 \
+    TIMER(name, seg)                                                \
+    ret;                                                            \
+  }
+
 } // namespace testbench
 } // namespace oceanbase
 
