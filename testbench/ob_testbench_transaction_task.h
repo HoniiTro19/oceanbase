@@ -31,6 +31,8 @@ namespace oceanbase
     typedef ObArrayWrap<bool> Commits;
     typedef ObArray<int64_t> Parameters;
     typedef ObArray<uint64_t> Dblinks;
+    typedef ObArray<Parameters> ParametersGroup;
+    typedef ObArray<Dblinks> DblinksGroup;
 
     struct BasicTaskConfig {
       const char *table_name;

@@ -30,9 +30,15 @@ public:
   int init(const char *database_name, const char *table_name, ObTestbenchSystableHelper *systable_helper);
   void destroy();
   int refresh_locations();
-  int generate_different_partitions(int64_t target, Parameters &parameters);
-  int generate_random_partition(const ObString &svr_ip, int64_t &parameter);
-  common::ObArray<ObString> &get_svr_ips();
+  int gen_distributed_txn_params(int64_t svrs, ParametersGroup &pgroup, DblinksGroup &dgroup);
+  int gen_contention_txn_params(int64_t conns, ParametersGroup &pgroup, DblinksGroup &dgroup);
+  int gen_deadlock_txn_params(int64_t conns, ParametersGroup &pgroup, DblinksGroup &dgroup);
+  int gen_concurrent_txn_params(int64_t conns, ParametersGroup &pgroup, DblinksGroup &dgroup);
+
+  // for test use
+  inline PartitionInfo *get_partition_info() { return &partition_info_; }
+  inline ObTenantName get_user_tenant() { return user_tenant_; }
+  inline common::ObArray<ObAddr> get_svr_addrs() { return svr_addrs_; }
 
 private:
   bool is_inited_;
@@ -40,8 +46,12 @@ private:
   const char *table_name_;
   ObTestbenchSystableHelper *systable_helper_;
   PartitionInfo partition_info_;
-  common::ObArray<ObString> svr_ips_;
+  common::ObArray<ObAddr> svr_addrs_;
+  common::ObArray<uint64_t> tenant_id_list_;
+  common::ObArray<ObTenantName> tenant_name_list_;
+  ObTenantName user_tenant_;
   ObRandom random_;
+  common::SpinRWLock lock_;
 };
 } // namespace testbench
 } // namespace oceanbase

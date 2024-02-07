@@ -249,7 +249,7 @@ int QueryPartitionInfoStrategy::build_sql_statement(
     ret = OB_INVALID_ARGUMENT;
     LOG_ERROR("invalid argument", KR(ret), K(sql_buf), K(mul_statement_buf_len));
   } else if (OB_FAIL(databuff_printf(sql_buf, mul_statement_buf_len, pos, 
-    "SELECT concat(concat(SVR_IP, ':'), SVR_PORT), PARTITION_NAME FROM CDB_OB_TABLE_LOCATIONS WHERE DATABASE_NAME = '%s' AND TABLE_NAME = '%s' AND ROLE = 'LEADER'",
+    "SELECT SVR_IP, SVR_PORT, PARTITION_NAME FROM CDB_OB_TABLE_LOCATIONS WHERE DATABASE_NAME = '%s' AND TABLE_NAME = '%s' AND ROLE = 'LEADER'",
       database_name_, table_name_))) {
     LOG_ERROR("build_sql_statement failed for query partition_info", KR(ret), K(pos), KCSTRING(sql_buf));
   }
@@ -715,24 +715,29 @@ int IObLogSysTableHelper::BatchSQLQuery::parse_record_from_row_(PartitionInfo &r
   int ret = OB_SUCCESS;
   int64_t index = -1;
   ObString svr_ip;
+  int64_t svr_port = -1;
   ObString partition_name;
   int64_t partition_id = -1;
   PartitionList *partition_ids = nullptr;
   index++;
   GET_DATA(varchar, index, svr_ip, "SVR_IP");
   index++;
+  GET_DATA(int, index, svr_port, "SVR_PORT");
+  index++;
   GET_DATA(varchar, index, partition_name, "PARTITION_NAME");
+  ObAddr svr_addr;
+  svr_addr.set_ip_addr(svr_ip, svr_port);
   ObString partition_name_prefix = partition_name.split_on('p');
   if (OB_FAIL(partition_name.get_numeric(partition_id))) {
     LOG_ERROR("get partition id failed", KR(ret));
-  } else if (OB_FAIL(records.get_refactored(svr_ip, partition_ids))) {
+  } else if (OB_FAIL(records.get_refactored(svr_addr, partition_ids))) {
     if (OB_HASH_NOT_EXIST == ret) {
       if (OB_ISNULL(partition_ids = partition_list_allocator_.alloc())) {
         ret = OB_ALLOCATE_MEMORY_FAILED;
         LOG_ERROR("alloc memoryfor partition list failed", KR(ret));
       } else if (OB_FAIL(partition_ids->push_back(partition_id))) {
         LOG_ERROR("push partition id failed", KR(ret));
-      } else if (OB_FAIL(records.set_refactored(svr_ip, partition_ids))) {
+      } else if (OB_FAIL(records.set_refactored(svr_addr, partition_ids))) {
         LOG_ERROR("create partition_ids failed");
       }
     } else {
@@ -749,7 +754,7 @@ int IObLogSysTableHelper::BatchSQLQuery::parse_record_from_row_(PartitionInfo &r
     partition_list_allocator_.free(partition_ids);
     partition_ids = nullptr;
   }
-  LOG_DEBUG("parse record from row", KR(ret), K(svr_ip), K(partition_name), K(partition_id));
+  LOG_TRACE("parse record from row", KR(ret), K(svr_ip), K(partition_name), K(partition_id));
   return ret;
 }
 
