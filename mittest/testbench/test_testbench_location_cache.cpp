@@ -49,47 +49,31 @@ TEST_F(TestTestbenchLocationCache, refresh_locations) {
 TEST_F(TestTestbenchLocationCache, generate_parameters) {
   ASSERT_EQ(OB_SUCCESS, location_cache.refresh_locations());
   int64_t times = 1000;
-  testbench::ParametersGroup pgroup;
-  testbench::DblinksGroup dgroup;
-  ASSERT_NE(OB_SUCCESS, location_cache.gen_distributed_txn_params(1000, pgroup, dgroup));
+  testbench::Parameters parameters;
+  testbench::Dblinks dblinks;
+  ASSERT_NE(OB_SUCCESS, location_cache.gen_distributed_txn_params(1000, parameters, dblinks));
   for (int64_t i = 0; i < times; ++i) {
     // distributed transaction
-    ASSERT_EQ(OB_SUCCESS, location_cache.gen_distributed_txn_params(2, pgroup, dgroup));
-    ASSERT_EQ(1, pgroup.count());
-    ASSERT_EQ(1, dgroup.count());
-    ASSERT_EQ(2, pgroup.at(0).count());
-    ASSERT_EQ(2, dgroup.at(0).count());
+    ASSERT_EQ(OB_SUCCESS, location_cache.gen_distributed_txn_params(2, parameters, dblinks));
+    ASSERT_EQ(2, parameters.count());
+    ASSERT_EQ(2, dblinks.count());
     // contention transaction
-    ASSERT_EQ(OB_SUCCESS, location_cache.gen_contention_txn_params(10, pgroup, dgroup));
-    ASSERT_EQ(10, pgroup.count());
-    ASSERT_EQ(10, dgroup.count());
-    for (int64_t j = 0; j < 10; ++j) {
-      ASSERT_EQ(1, pgroup.at(j).count());
-      ASSERT_EQ(1, dgroup.at(j).count());
-    }
+    ASSERT_EQ(OB_SUCCESS, location_cache.gen_contention_txn_params(10, parameters, dblinks));
+    ASSERT_EQ(10, parameters.count());
+    ASSERT_EQ(10, dblinks.count());
     // deadlock transaction
-    ASSERT_EQ(OB_SUCCESS, location_cache.gen_deadlock_txn_params(12, pgroup, dgroup));
-    ASSERT_EQ(12, pgroup.count());
-    ASSERT_EQ(12, dgroup.count());
-    for (int64_t j = 0; j < 12; ++j) {
-      ASSERT_EQ(1, pgroup.at(j).count());
-      ASSERT_EQ(1, dgroup.at(j).count());
-    }
+    ASSERT_EQ(OB_SUCCESS, location_cache.gen_deadlock_txn_params(12, parameters, dblinks));
+    ASSERT_EQ(12, parameters.count());
+    ASSERT_EQ(12, dblinks.count());
     // concurrent transaction
-    ASSERT_EQ(OB_SUCCESS, location_cache.gen_concurrent_txn_params(20, pgroup, dgroup));
-    ASSERT_EQ(20, pgroup.count());
-    ASSERT_EQ(20, dgroup.count());
-    for (int64_t j = 0; j < 20; ++j) {
-      ASSERT_EQ(1, pgroup.at(j).count());
-      ASSERT_EQ(1, dgroup.at(j).count());
-    }
+    ASSERT_EQ(OB_SUCCESS, location_cache.gen_concurrent_txn_params(20, parameters, dblinks));
+    ASSERT_EQ(20, parameters.count());
+    ASSERT_EQ(20, dblinks.count());
   }
 }
 
 TEST_F(TestTestbenchLocationCache, concurrent_request) {
   ASSERT_EQ(OB_SUCCESS, location_cache.refresh_locations());
-  testbench::ParametersGroup pgroup;
-  testbench::DblinksGroup dgroup;
   auto write_request = [&]() {
     int times = 0;
     while (times < 5) {
@@ -100,10 +84,11 @@ TEST_F(TestTestbenchLocationCache, concurrent_request) {
   };
   auto read_request = [&]() {
     testbench::Parameters parameters;
+    testbench::Dblinks dblinks;
     int times = 0;
     int64_t parameter = -1;
     while (times < 100000) {
-      ASSERT_EQ(OB_SUCCESS, location_cache.gen_concurrent_txn_params(1, pgroup, dgroup));
+      ASSERT_EQ(OB_SUCCESS, location_cache.gen_concurrent_txn_params(1, parameters, dblinks));
       ++times;
     }
   };

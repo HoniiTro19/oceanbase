@@ -3,6 +3,7 @@
 #include "testbench/ob_testbench_statistics_collector.h"
 #include "testbench/ob_testbench_server_provider.h"
 #include "testbench/ob_testbench_transaction_task.h"
+#include "testbench/ob_testbench_location_cache.h"
 #include "lib/random/ob_random.h"
 
 namespace oceanbase {
@@ -27,6 +28,9 @@ public:
   ObTestbenchMySQLProxy mysql_proxy;
   ObStatisticsCollectorOptions opts {"capacity=500,minimum=10,maximum=80,threads=1,tasks=99999"};
   ObTestbenchStatisticsCollector statistics_collector;
+  ObTestbenchSystableHelper systable_helper;
+  ObTestbenchLocationCache location_cache;
+  const char *database_name = "test";
   const char *table_name = "testbench";
   ObRandom random;
   ObArenaAllocator allocator;
@@ -55,64 +59,124 @@ void TestTransactionTask::SetUp() {
   tenant_name_str = tenant_name_array[1].str();
   uint64_t tenant_id = tenant_array[1];
   ASSERT_EQ(OB_SUCCESS, server_provider->get_tenant_servers(tenant_id, server_array));
+  ASSERT_EQ(OB_SUCCESS, systable_helper.init_conn(mysql_config));
+  ASSERT_EQ(OB_SUCCESS, location_cache.init(database_name, table_name, &systable_helper));
+  ASSERT_EQ(OB_SUCCESS, location_cache.refresh_locations());
 }
 
 void TestTransactionTask::Tear() {
   mysql_proxy.destroy();
   statistics_collector.destroy();
+  systable_helper.destroy();
+  location_cache.destroy();
 }
 
 TEST_F(TestTransactionTask, distributed_transaction) {
   int64_t transaction_count = 1000;
-  Dblinks dblink_array;
-  int64_t count = server_array.count();
-  int64_t connections = 50;
-  for (int i = 0; i < connections; ++i) {
-    dblink_array.push_back(DblinkKey(tenant_name_str, server_array[i % count]).hash());
-  }
-  TESTBENCH_LOG(TRACE, "dblink array", "count", dblink_array.count());
-  for (int i = 0; i < transaction_count; ++i) {
-    Parameters partition_ids;
-    for (int j = 0; j < 2; ++j) {
-      // ensure there are at least 50 partitions numbered from 1 to 50 in the database
-      partition_ids.push_back(random.rand(0, 8));
-    }
-    BasicTaskConfig config{ table_name, connections, &statistics_collector, dblink_array, &mysql_proxy, partition_ids, i * 1000};
-    ObDistributedTransactionTask distributed_transaction_task(config, 2, 10);
+  int64_t connections = 1;
+  int64_t svrs = 2;
+  for (int64_t i = 0; i < transaction_count; ++i) {
+    Parameters parameters;
+    Dblinks dblinks;
+    ASSERT_EQ(OB_SUCCESS, location_cache.gen_distributed_txn_params(svrs, parameters, dblinks));
+    BasicTaskConfig config{ table_name, connections, &statistics_collector, &mysql_proxy, parameters, dblinks, i * 10 };
+    ObDistributedTransactionTask distributed_transaction_task(config, svrs, 10);
     ASSERT_EQ(OB_SUCCESS, distributed_transaction_task.init());
-    TESTBENCH_LOG(TRACE, "distributed_transaction_task init", "index", i);
     ASSERT_EQ(OB_SUCCESS, distributed_transaction_task.execute_transactions());
-    TESTBENCH_LOG(TRACE, "distributed_transaction_task execute_transactions", "index", i);
     ASSERT_EQ(OB_SUCCESS, distributed_transaction_task.release_dblinks());
-    TESTBENCH_LOG(TRACE, "execute distributed transaction succeed", "index", i);
+    Commits *commits = distributed_transaction_task.get_commits();
+    Latencys *latencys = distributed_transaction_task.get_latencys();
+    Latencys *cumu_latencys = distributed_transaction_task.get_cumulative_latencys();
+    for (int64_t j = 0; j < connections; ++j) {
+      ASSERT_EQ(true, commits->at(j));
+      ASSERT_GT(latencys->at(j), 0);
+      ASSERT_GT(cumu_latencys->at(j), 0);
+    }
   }
 }
 
 TEST_F(TestTransactionTask, contention_transaction) {
-  int64_t transaction_count = 100;
-  Dblinks dblink_array;
-  int64_t count = server_array.count();
-  int64_t connections = 1;
-  for (int i = 0; i < connections; ++i) {
-    dblink_array.push_back(DblinkKey(tenant_name_str, server_array[i % count]).hash());
-  }
-  TESTBENCH_LOG(TRACE, "dblink array", "count", dblink_array.count());
-  for (int i = 0; i < transaction_count; ++i) {
-    Parameters partition_ids;
-    partition_ids.push_back(random.rand(0, 8));
-    BasicTaskConfig config { table_name, connections, &statistics_collector, dblink_array, &mysql_proxy, partition_ids, i * 20};
-    ObContentionTransactionTask contention_transaction_task(config, 0, 10);
+  int64_t transaction_count = 1000;
+  int64_t connections = 10;
+  for (int64_t i = 0; i < transaction_count; ++i) {
+    Parameters parameters;
+    Dblinks dblinks;
+    int64_t aborts = random.rand(1, connections);
+    ASSERT_EQ(OB_SUCCESS, location_cache.gen_contention_txn_params(connections, parameters, dblinks));
+    BasicTaskConfig config { table_name, connections, &statistics_collector, &mysql_proxy, parameters, dblinks, i * 100 };
+    ObContentionTransactionTask contention_transaction_task(config, aborts, 10);
     ASSERT_EQ(OB_SUCCESS, contention_transaction_task.init());
-    TESTBENCH_LOG(TRACE, "contention_transaction init", "index", i);
     ASSERT_EQ(OB_SUCCESS, contention_transaction_task.execute_transactions());
-    TESTBENCH_LOG(TRACE, "contention_transaction execute_transactions", "index", i);
     ASSERT_EQ(OB_SUCCESS, contention_transaction_task.release_dblinks());
-    TESTBENCH_LOG(TRACE, "execute contention_transaction succeed", "index", i);
+    Commits *commits = contention_transaction_task.get_commits();
+    Latencys *latencys = contention_transaction_task.get_latencys();
+    Latencys *cumu_latencys = contention_transaction_task.get_cumulative_latencys();
+    int64_t finished = contention_transaction_task.get_finished();
+    ASSERT_EQ(finished, connections);
+    int64_t act_aborts = 0;
+    for (int64_t j = 0; j < connections; ++j) {
+      act_aborts = commits->at(j) ? act_aborts : act_aborts + 1;
+      ASSERT_GT(latencys->at(j), 0);
+      ASSERT_GT(cumu_latencys->at(j), 0);
+    }
+    ASSERT_EQ(act_aborts, aborts);
   }
 }
 
 TEST_F(TestTransactionTask, deadlock_transaction) {
+  int64_t transaction_count = 50;
+  int64_t connections = 9;
+  int64_t chains = 3;
+  int64_t cycle = connections / chains;
+  for (int64_t i = 0; i < transaction_count; ++i) {
+    Parameters parameters;
+    Dblinks dblinks;
+    ASSERT_EQ(OB_SUCCESS, location_cache.gen_deadlock_txn_params(connections, parameters, dblinks));
+    BasicTaskConfig config { table_name, connections, &statistics_collector, &mysql_proxy, parameters, dblinks, i * 10 };
+    ObDeadlockTransactionTask deadlock_transaction_task(config, chains);
+    ASSERT_EQ(OB_SUCCESS, deadlock_transaction_task.init());
+    ASSERT_EQ(OB_SUCCESS, deadlock_transaction_task.execute_transactions());
+    ASSERT_EQ(OB_SUCCESS, deadlock_transaction_task.release_dblinks());
+    Commits *commits = deadlock_transaction_task.get_commits();
+    Latencys *latencys = deadlock_transaction_task.get_latencys();
+    Latencys *cumu_latencys = deadlock_transaction_task.get_cumulative_latencys();
+    for (int64_t j = 0; j < connections; ++j) {
+      if (j % cycle == cycle - 1) {
+        ASSERT_GT(latencys->at(j), 0);        
+      }
+      ASSERT_GT(cumu_latencys->at(j), 0);
+    }
+  }
+}
 
+TEST_F(TestTransactionTask, concurrent_transaction) {
+  int64_t transaction_count = 1000;
+  int64_t connections = 10;
+  for (int64_t i = 0; i < transaction_count; ++i) {
+    Parameters parameters;
+    Dblinks dblinks;
+    ASSERT_EQ(OB_SUCCESS, location_cache.gen_concurrent_txn_params(connections, parameters, dblinks));
+    BasicTaskConfig config { table_name, connections, &statistics_collector, &mysql_proxy, parameters, dblinks, i * 100 };
+    Readonlys readonlys;
+    readonlys.reset();
+    for (int64_t j = 0; j < connections; ++j) {
+      bool readonly = random.rand(1, 10) <= 5;
+      readonlys.push_back(readonly);
+    }
+    ObConcurrentTransactionTask concurrent_transaction_task(config, 10, readonlys);
+    ASSERT_EQ(OB_SUCCESS, concurrent_transaction_task.init());
+    ASSERT_EQ(OB_SUCCESS, concurrent_transaction_task.execute_transactions());
+    ASSERT_EQ(OB_SUCCESS, concurrent_transaction_task.release_dblinks());
+    Commits *commits = concurrent_transaction_task.get_commits();
+    Latencys *latencys = concurrent_transaction_task.get_latencys();
+    Latencys *cumu_latencys = concurrent_transaction_task.get_cumulative_latencys();
+    int64_t finished = concurrent_transaction_task.get_finished();
+    ASSERT_EQ(connections, finished);
+    for (int64_t j = 0; j < connections; ++j) {
+      ASSERT_EQ(true, commits->at(j));
+      ASSERT_GT(cumu_latencys->at(j), 0);
+    }
+  }
 }
 } // unittest
 } // oceanbase

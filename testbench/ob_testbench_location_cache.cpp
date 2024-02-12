@@ -79,7 +79,7 @@ int ObTestbenchLocationCache::refresh_locations() {
   return ret;
 }
 
-int ObTestbenchLocationCache::gen_distributed_txn_params(int64_t svrs, ParametersGroup &pgroup, DblinksGroup &dgroup)
+int ObTestbenchLocationCache::gen_distributed_txn_params(int64_t svrs, Parameters &parameters, Dblinks &dblinks)
 {
   int ret = OB_SUCCESS;
   common::SpinWLockGuard guard(lock_);
@@ -88,8 +88,8 @@ int ObTestbenchLocationCache::gen_distributed_txn_params(int64_t svrs, Parameter
     ret = OB_ERR_UNEXPECTED;
     TESTBENCH_LOG(ERROR, "the number of servers is smaller than svrs", KR(ret), K_(svr_addrs), K(svrs));
   } else {
-    Parameters parameters;
-    Dblinks dblinks;
+    parameters.reset();
+    dblinks.reset();
     for (int64_t i = 0; i < svrs; ++i) {
       PartitionList *partition_ids = nullptr;
       int64_t swap_idx = random_.rand(i, svr_count - 1);
@@ -106,19 +106,12 @@ int ObTestbenchLocationCache::gen_distributed_txn_params(int64_t svrs, Parameter
         }
       }
     }
-    pgroup.reset();
-    dgroup.reset();
-    if (OB_FAIL(pgroup.push_back(parameters))) {
-      TESTBENCH_LOG(ERROR, "push back parameters failed", KR(ret));
-    } else if (OB_FAIL(dgroup.push_back(dblinks))) {
-      TESTBENCH_LOG(ERROR, "push back dblinks failed", KR(ret));
-    }
-    TESTBENCH_LOG(TRACE, "generate distributed transaction parameters", KR(ret), K(pgroup), K(dgroup));
+    TESTBENCH_LOG(TRACE, "generate distributed transaction parameters", KR(ret), K(parameters), K(dblinks));
   }
   return ret;
 }
 
-int ObTestbenchLocationCache::gen_contention_txn_params(int64_t conns, ParametersGroup &pgroup, DblinksGroup &dgroup)
+int ObTestbenchLocationCache::gen_contention_txn_params(int64_t conns, Parameters &parameters, Dblinks &dblinks)
 {
   int ret = OB_SUCCESS;
   common::SpinWLockGuard guard(lock_);
@@ -127,35 +120,29 @@ int ObTestbenchLocationCache::gen_contention_txn_params(int64_t conns, Parameter
     ret = OB_ERR_UNEXPECTED;
     TESTBENCH_LOG(ERROR,  "get empty server list", KR(ret), K_(svr_addrs));
   } else {
-    pgroup.reset();
-    dgroup.reset();
+    parameters.reset();
+    dblinks.reset();
     int64_t rnd_idx = random_.rand(0, svr_count - 1);
     PartitionList *partition_ids = nullptr;
     if (OB_FAIL(partition_info_.get_refactored(svr_addrs_.at(rnd_idx), partition_ids))) {
       TESTBENCH_LOG(ERROR, "get partition ids from partition info failed", KR(ret), "addr", svr_addrs_.at(rnd_idx));
     } else {
       for (int64_t i = 0; i < conns; ++i) {
-        Parameters parameters;
-        Dblinks dblinks;
         int64_t partition_count = partition_ids->count();
         int64_t sample_idx = random_.rand(0, partition_count - 1);
         if (OB_FAIL(parameters.push_back(partition_ids->at(sample_idx)))) {
           TESTBENCH_LOG(ERROR, "push back partition id failed");
         } else if (OB_FAIL(dblinks.push_back(DblinkKey(user_tenant_.str(), svr_addrs_.at(rnd_idx)).hash()))) {
           TESTBENCH_LOG(ERROR, "push back dblink id failed", KR(ret));
-        } else if (OB_FAIL(pgroup.push_back(parameters))) {
-          TESTBENCH_LOG(ERROR, "push back parameters failed", KR(ret));
-        } else if (OB_FAIL(dgroup.push_back(dblinks))) {
-          TESTBENCH_LOG(ERROR, "push back dblinks failed", KR(ret));
         }
       }
     }
-    TESTBENCH_LOG(TRACE, "generate contention transaction parameters", KR(ret), K(pgroup), K(dgroup));
+    TESTBENCH_LOG(TRACE, "generate contention transaction parameters", KR(ret), K(parameters), K(dblinks));
   }
   return ret;
 }
 
-int ObTestbenchLocationCache::gen_deadlock_txn_params(int64_t conns, ParametersGroup &pgroup, DblinksGroup &dgroup)
+int ObTestbenchLocationCache::gen_deadlock_txn_params(int64_t conns, Parameters &parameters, Dblinks &dblinks)
 {
   int ret = OB_SUCCESS;
   common::SpinWLockGuard guard(lock_);
@@ -164,12 +151,10 @@ int ObTestbenchLocationCache::gen_deadlock_txn_params(int64_t conns, ParametersG
     ret = OB_ERR_UNEXPECTED;
     TESTBENCH_LOG(ERROR, "get empty server list", KR(ret), K_(svr_addrs));
   } else {
-    pgroup.reset();
-    dgroup.reset();
+    parameters.reset();
+    dblinks.reset();
     for (int64_t i = 0; i < conns; ++i) {
       PartitionList *partition_ids = nullptr;
-      Parameters parameters;
-      Dblinks dblinks;
       if (OB_FAIL(partition_info_.get_refactored(svr_addrs_.at(i % svr_count), partition_ids))) {
         TESTBENCH_LOG(ERROR, "get partition ids from partition info failed", KR(ret), "addr", svr_addrs_.at(i % svr_count));
       } else {
@@ -177,21 +162,17 @@ int ObTestbenchLocationCache::gen_deadlock_txn_params(int64_t conns, ParametersG
         int64_t sample_idx = random_.rand(0, partition_count - 1);
         if (OB_FAIL(parameters.push_back(partition_ids->at(sample_idx)))) {
           TESTBENCH_LOG(ERROR, "push back partition id failed", KR(ret));
-        } else if (OB_FAIL(dblinks.push_back(DblinkKey(user_tenant_.str(), svr_addrs_.at(i)).hash()))) {
+        } else if (OB_FAIL(dblinks.push_back(DblinkKey(user_tenant_.str(), svr_addrs_.at(i % svr_count)).hash()))) {
           TESTBENCH_LOG(ERROR, "push back dblink id failed", KR(ret));
-        } else if (OB_FAIL(pgroup.push_back(parameters))) {
-          TESTBENCH_LOG(ERROR, "push back parameters failed", KR(ret));
-        } else if (OB_FAIL(dgroup.push_back(dblinks))) {
-          TESTBENCH_LOG(ERROR, "push back dblinks failed", KR(ret));
         }
       }
     }
-    TESTBENCH_LOG(TRACE, "generate global deadlock transaction parameters", KR(ret), K(pgroup), K(dgroup));
+    TESTBENCH_LOG(TRACE, "generate global deadlock transaction parameters", KR(ret), K(parameters), K(dblinks));
   }
   return ret;
 }
 
-int ObTestbenchLocationCache::gen_concurrent_txn_params(int64_t conns, ParametersGroup &pgroup, DblinksGroup &dgroup)
+int ObTestbenchLocationCache::gen_concurrent_txn_params(int64_t conns, Parameters &parameters, Dblinks &dblinks)
 {
   int ret = OB_SUCCESS;
   common::SpinWLockGuard guard(lock_);
@@ -200,13 +181,11 @@ int ObTestbenchLocationCache::gen_concurrent_txn_params(int64_t conns, Parameter
     ret = OB_ERR_UNEXPECTED;
     TESTBENCH_LOG(ERROR, "get empty server list", KR(ret), K_(svr_addrs));
   } else {
-    pgroup.reset();
-    dgroup.reset();
+    parameters.reset();
+    dblinks.reset();
     for (int64_t i = 0; i < conns; ++i) {
       PartitionList *partition_ids = nullptr;
       int64_t rnd_idx = random_.rand(0, svr_count - 1);
-      Parameters parameters;
-      Dblinks dblinks;
       if (OB_FAIL(partition_info_.get_refactored(svr_addrs_.at(rnd_idx), partition_ids))) {
         TESTBENCH_LOG(ERROR, "get partition ids from partition info failed", KR(ret), "addr", svr_addrs_.at(rnd_idx));
       } else {
@@ -214,16 +193,12 @@ int ObTestbenchLocationCache::gen_concurrent_txn_params(int64_t conns, Parameter
         int64_t sample_idx = random_.rand(0, partition_count - 1);
         if (OB_FAIL(parameters.push_back(partition_ids->at(sample_idx)))) {
           TESTBENCH_LOG(ERROR, "push back partition id failed", KR(ret));
-        } else if (OB_FAIL(dblinks.push_back(DblinkKey(user_tenant_.str(), svr_addrs_.at(i)).hash()))) {
+        } else if (OB_FAIL(dblinks.push_back(DblinkKey(user_tenant_.str(), svr_addrs_.at(rnd_idx)).hash()))) {
           TESTBENCH_LOG(ERROR, "push back dblink id failed", KR(ret));
-        } else if (OB_FAIL(pgroup.push_back(parameters))) {
-          TESTBENCH_LOG(ERROR, "push back parameters failed", KR(ret));
-        } else if (OB_FAIL(dgroup.push_back(dblinks))) {
-          TESTBENCH_LOG(ERROR, "push back dblinks failed", KR(ret));
         }
       }
     }
-    TESTBENCH_LOG(TRACE, "generate global deadlock transaction parameters", KR(ret), K(pgroup), K(dgroup));
+    TESTBENCH_LOG(TRACE, "generate global deadlock transaction parameters", KR(ret), K(parameters), K(dblinks));
   }
   return ret;
 }

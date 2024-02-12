@@ -450,9 +450,10 @@ class TestBench(object):
         CREATE TABLE IF NOT EXISTS {} (
             partition_id BIGINT NOT NULL,
             row_id BIGINT NOT NULL,
-            lock_txn BIGINT NOT NULL,
+            lock_dist BIGINT NOT NULL,
             lock_elr BIGINT NOT NULL,
             lock_lcl BIGINT NOT NULL,
+            lock_txn BIGINT NOT NULL,
             PRIMARY KEY(partition_id, row_id)
         ) TABLEGROUP = 'tb_group' PARTITION BY HASH (partition_id) PARTITIONS {}
         '''.format(self._table_name, partitions)

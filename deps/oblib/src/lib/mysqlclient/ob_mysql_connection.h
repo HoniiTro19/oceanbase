@@ -122,8 +122,8 @@ public:
   int start_transaction_async(bool with_snap_shot = false);
   int rollback_async();
   int commit_async();
-  int get_conn_status();
-  int update_conn_status();
+  int wait_for_async_status(int timeout = -1);
+  inline ConnStatus get_conn_status() { return conn_status_; }
 
   // session environment
   virtual int get_session_variable(const ObString &name, int64_t &val) override;
@@ -156,11 +156,14 @@ public:
 
   // dblink.
   virtual int connect_dblink(const bool use_ssl, int64_t sql_request_level, bool async = false);
+  int get_async_status() const; 
+  void set_async_status(int async_status);
+  int run_contfunc_and_update_status();
 
 private:
   int switch_tenant(const uint64_t tenant_id);
   int reset_read_consistency();
-  int wait_for_mysql();
+  int wait_for_mysql(int timeout = -1);
 
 private:
   const static int64_t READ_CONSISTENCY_STRONG = 3;
@@ -195,6 +198,8 @@ private:
   DISALLOW_COPY_AND_ASSIGN(ObMySQLConnection);
 };
 
+inline int ObMySQLConnection::get_async_status() const { return async_status_; }
+inline void ObMySQLConnection::set_async_status(int async_status) { async_status_ = async_status; }
 inline bool ObMySQLConnection::is_busy() const { return busy_; }
 inline void ObMySQLConnection::set_busy(const bool busy) { busy_ = busy; }
 inline bool ObMySQLConnection::is_closed() const { return closed_; }
@@ -252,10 +257,10 @@ public:
   virtual int update_status() override;
 };
 
-class ObStmtUpdateContFunc : public ObContFunc {
+class ObStmtStoreContFunc : public ObContFunc {
 public:
-  ObStmtUpdateContFunc(ObMySQLConnection *conn) : ObContFunc(conn) {}
-  virtual ~ObStmtUpdateContFunc() {}
+  ObStmtStoreContFunc(ObMySQLConnection *conn) : ObContFunc(conn) {}
+  virtual ~ObStmtStoreContFunc() {}
   virtual void run_func() override;
   virtual int update_status() override;
 };

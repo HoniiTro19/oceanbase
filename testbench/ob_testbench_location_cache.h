@@ -30,10 +30,10 @@ public:
   int init(const char *database_name, const char *table_name, ObTestbenchSystableHelper *systable_helper);
   void destroy();
   int refresh_locations();
-  int gen_distributed_txn_params(int64_t svrs, ParametersGroup &pgroup, DblinksGroup &dgroup);
-  int gen_contention_txn_params(int64_t conns, ParametersGroup &pgroup, DblinksGroup &dgroup);
-  int gen_deadlock_txn_params(int64_t conns, ParametersGroup &pgroup, DblinksGroup &dgroup);
-  int gen_concurrent_txn_params(int64_t conns, ParametersGroup &pgroup, DblinksGroup &dgroup);
+  int gen_distributed_txn_params(int64_t svrs, Parameters &parameters, Dblinks &dblinks);
+  int gen_contention_txn_params(int64_t conns, Parameters &parameters, Dblinks &dblinks);
+  int gen_deadlock_txn_params(int64_t conns, Parameters &parameters, Dblinks &dblinks);
+  int gen_concurrent_txn_params(int64_t conns, Parameters &parameters, Dblinks &dblinks);
 
   // for test use
   inline PartitionInfo *get_partition_info() { return &partition_info_; }

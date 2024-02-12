@@ -647,7 +647,7 @@ int ObMySQLConnection::get_async_write_result(int64_t &affected_rows)
     LOG_WARN("connection not established. call connect first", K(ret));
   } else if (OB_UNLIKELY(ConnStatus::PENDING == conn_status_)) {
     ret = OB_ERR_UNEXPECTED;
-    LOG_WARN("async result is not ready. call get_conn_status first", K(ret));
+    LOG_WARN("async result is not ready. call wait_for_async_status first", K(ret));
   } else {
     affected_rows = mysql_stmt_affected_rows(mysql_stmt_);
     LOG_TRACE("get async write result", K(affected_rows), K(ret));
@@ -765,7 +765,7 @@ int ObMySQLConnection::get_async_read_result(ObMySQLPreparedStatement &stmt, ObI
     LOG_WARN("connection not established. call connect first", K(ret));
   } else if (OB_UNLIKELY(ConnStatus::PENDING == conn_status_)) {
     ret = OB_ERR_UNEXPECTED;
-    LOG_WARN("async result is not ready. call get_conn_status first.", K(ret));
+    LOG_WARN("async result is not ready. call wait_for_async_status first.", K(ret));
   } else if (OB_FAIL(res.create_handler(read_ctx))) {
     LOG_WARN("create result handler failed", K(ret));
   } else if (OB_FAIL(stmt.get_async_read_result(read_ctx->result_))) {
@@ -894,25 +894,30 @@ int ObMySQLConnection::connect_dblink(const bool use_ssl, int64_t sql_request_le
 }
 
 // Async Mode
-int ObMySQLConnection::wait_for_mysql()
+int ObMySQLConnection::wait_for_mysql(int timeout)
 {
-  int ret = OB_SUCCESS;
   struct pollfd pfd;
-  int timeout, res;
+  int res;
+  int poll_timeout;
   pfd.fd = mysql_get_socket(&mysql_);
   pfd.events = (async_status_ & MYSQL_WAIT_READ ? POLLIN : 0) |
                (async_status_ & MYSQL_WAIT_WRITE ? POLLOUT : 0) |
                (async_status_ & MYSQL_WAIT_EXCEPT ? POLLPRI : 0);
-  if (async_status_ & MYSQL_WAIT_TIMEOUT) {
-    timeout = 1000 * mysql_get_timeout_value(&mysql_);
+  if (timeout == 0) {
+    poll_timeout = 0;
+  } else if (async_status_ & MYSQL_WAIT_TIMEOUT) {
+    poll_timeout = 1000 * mysql_get_timeout_value(&mysql_);
   } else {
-    timeout = -1;
+    poll_timeout = -1;
   }
-  res = poll(&pfd, 1, timeout);
-  if (res == 0) {
-    async_status_ = MYSQL_WAIT_TIMEOUT; 
-  } else if (res < 0) {
-    async_status_ = MYSQL_WAIT_TIMEOUT; 
+  res = poll(&pfd, 1, poll_timeout);
+  if (res <= 0) {
+    if (poll_timeout > 0) {
+      async_status_ = MYSQL_WAIT_TIMEOUT;
+      return OB_TIMEOUT;
+    } else {
+      return OB_NEED_RETRY;
+    }
   } else {
     async_status_ = 0;
     if (pfd.revents & POLLIN) {
@@ -925,7 +930,7 @@ int ObMySQLConnection::wait_for_mysql()
       async_status_ |= MYSQL_WAIT_EXCEPT;
     }
   }
-  return ret;
+  return OB_SUCCESS;
 }
 
 int ObMySQLConnection::commit_async()
@@ -966,27 +971,28 @@ int ObMySQLConnection::rollback_async()
   return ret;
 }
 
-int ObMySQLConnection::get_conn_status()
+int ObMySQLConnection::wait_for_async_status(int timeout)
 {
   int ret = OB_SUCCESS;
-  if (OB_UNLIKELY(nullptr == cont_funcs_[cur_cont_func_])) {
-    ret = OB_NOT_INIT;
-    LOG_WARN("mysql async continue function not init", K(cur_cont_func_));  
-  } else {
-    while (async_status_) {
-      wait_for_mysql();
-      cont_funcs_[cur_cont_func_]->run_func();
-    }
+  if (OB_FAIL(wait_for_mysql(timeout))) {
+    LOG_TRACE("poll from mysql failed", K(ret));
+  } else if (FALSE_IT(cont_funcs_[cur_cont_func_]->run_func())) {
+    // impossible
+  } else if (OB_UNLIKELY(async_status_)) {
+    ret = OB_NEED_RETRY;
+  } else if (OB_FAIL(cont_funcs_[cur_cont_func_]->update_status())) {
+    LOG_WARN("continue function update status failed", K(ret));
   }
   return ret;
 }
 
-int ObMySQLConnection::update_conn_status()
+int ObMySQLConnection::run_contfunc_and_update_status()
 {
   int ret = OB_SUCCESS;
-  if (OB_UNLIKELY(nullptr == cont_funcs_[cur_cont_func_])) {
-    ret = OB_NOT_INIT;
-    LOG_WARN("mysql async continue function not init", K(cur_cont_func_));  
+  if (FALSE_IT(cont_funcs_[cur_cont_func_]->run_func())) {
+    // impossible
+  } else if (OB_UNLIKELY(async_status_)) {
+    ret = OB_NEED_RETRY;
   } else if (OB_FAIL(cont_funcs_[cur_cont_func_]->update_status())) {
     LOG_WARN("continue function update status failed", K(ret));
   }
@@ -1001,9 +1007,6 @@ int ObContFunc::update_int_status()
     const char *err_msg = mysql_error(&conn_->mysql_);
     ret = mysql_errno(&conn_->mysql_);
     TESTBENCH_LOG(ERROR, "async cont function get error", K(err_msg), K(ret));
-  } else if (OB_LIKELY(conn_->async_status_)) {
-    conn_->conn_status_ = ObMySQLConnection::ConnStatus::PENDING;
-    ret = OB_NEED_RETRY;
   } else {
     conn_->conn_status_ = ObMySQLConnection::ConnStatus::SUCCESS;
   }
@@ -1018,9 +1021,6 @@ int ObContFunc::update_bool_status()
     const char *err_msg = mysql_error(&conn_->mysql_);
     ret = mysql_errno(&conn_->mysql_);
     TESTBENCH_LOG(ERROR, "async cont function get error", K(err_msg), K(ret));
-  } else if (OB_LIKELY(conn_->async_status_)) {
-    conn_->conn_status_ = ObMySQLConnection::ConnStatus::PENDING;
-    ret = OB_NEED_RETRY;
   } else {
     conn_->conn_status_ = ObMySQLConnection::ConnStatus::SUCCESS;
   }
@@ -1035,9 +1035,6 @@ int ObContFunc::update_stmt_status()
     const char *err_msg = mysql_stmt_error(conn_->mysql_stmt_);
     ret = mysql_stmt_errno(conn_->mysql_stmt_);
     TESTBENCH_LOG(ERROR, "async cont function get error", K(err_msg), K(ret));
-  } else if (OB_LIKELY(conn_->async_status_)) {
-    conn_->conn_status_ = ObMySQLConnection::ConnStatus::PENDING;
-    ret = OB_NEED_RETRY;
   } else {
     conn_->conn_status_ = ObMySQLConnection::ConnStatus::SUCCESS;
   }
@@ -1052,9 +1049,6 @@ int ObContFunc::update_mysql_status()
     const char *err_msg = mysql_error(&conn_->mysql_);
     ret = mysql_errno(&conn_->mysql_);
     TESTBENCH_LOG(ERROR, "async cont function get error", K(err_msg), K(ret));
-  } else if (OB_LIKELY(conn_->async_status_)) {
-    conn_->conn_status_ = ObMySQLConnection::ConnStatus::PENDING;
-    ret = OB_NEED_RETRY;
   } else {
     conn_->conn_status_ = ObMySQLConnection::ConnStatus::SUCCESS;
   }
@@ -1085,16 +1079,18 @@ void ObStmtQueryContFunc::run_func()
 {
   conn_->async_status_ = mysql_stmt_execute_cont(&conn_->mysql_int_err_, conn_->mysql_stmt_, conn_->async_status_);
 }
+
 int ObStmtQueryContFunc::update_status()
 {
   return update_stmt_status();
 }
 
-void ObStmtUpdateContFunc::run_func() 
+void ObStmtStoreContFunc::run_func() 
 {
-  conn_->async_status_ = mysql_stmt_execute_cont(&conn_->mysql_int_err_, conn_->mysql_stmt_, conn_->async_status_);
+  conn_->async_status_ = mysql_stmt_store_result_cont(&conn_->mysql_int_err_, conn_->mysql_stmt_, conn_->async_status_);
 }
-int ObStmtUpdateContFunc::update_status()
+
+int ObStmtStoreContFunc::update_status()
 {
   return update_stmt_status();
 }

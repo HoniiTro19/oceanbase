@@ -31,7 +31,8 @@ namespace testbench
 #define WORKLOAD_TYPES                                  \
   X(DISTRIBUTED_TRANSACTION, "distributed_transaction") \
   X(CONTENTION, "contention")                           \
-  X(DEADLOCK, "deadlock")
+  X(DEADLOCK, "deadlock")                               \
+  X(CONCURRENT, "concurrent")
 
 #define X(key, value) key,
   enum WorkloadType

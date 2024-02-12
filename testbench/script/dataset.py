@@ -129,7 +129,7 @@ class DatasetManager(Manager):
       csv_writer = csv.writer(csv_file)
       for partition in range(self._dataset_config["partitions"]):
         for row in range(self._dataset_config["rows"]):
-          csv_writer.writerow([partition, row, 0, 0, 0])
+          csv_writer.writerow([partition, row, 0, 0, 0, 0])
     except Exception as e:
       self.stdio.error(
         "Fail to write csv dataset into the file, exception: {}.".format(e.message)

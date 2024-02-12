@@ -87,7 +87,7 @@ TEST_F(TestAsyncOperation, basic_async_api) {
   ASSERT_EQ(OB_SUCCESS, conn->prepare_statement(stmt, sql));
   EXPECT_EQ(OB_SUCCESS, stmt.bind_param_int(0, &col3));
   EXPECT_EQ(OB_SUCCESS, conn->execute_write_async(stmt));
-  while (OB_FAIL(conn->get_conn_status())) {
+  while (OB_FAIL(conn->wait_for_async_status())) {
     EXPECT_EQ(OB_NEED_RETRY, ret);
   }
   EXPECT_EQ(OB_SUCCESS, conn->get_async_write_result(affected_rows));
@@ -105,7 +105,7 @@ TEST_F(TestAsyncOperation, basic_async_api) {
   ASSERT_EQ(OB_SUCCESS, conn->prepare_statement(stmt, sql));
   EXPECT_EQ(OB_SUCCESS, stmt.bind_param_int(0, &col1));
   EXPECT_EQ(OB_SUCCESS, conn->execute_read_async(stmt));
-  while (OB_FAIL(conn->get_conn_status())) {
+  while (OB_FAIL(conn->wait_for_async_status())) {
     EXPECT_EQ(OB_NEED_RETRY, ret);
   }
   int64_t id = 0;
@@ -117,19 +117,19 @@ TEST_F(TestAsyncOperation, basic_async_api) {
   EXPECT_EQ(OB_ITER_END, result->next());
   // test transaction async
   EXPECT_EQ(OB_SUCCESS, conn->start_transaction_async());
-  while (OB_FAIL(conn->get_conn_status())) {
+  while (OB_FAIL(conn->wait_for_async_status())) {
     EXPECT_EQ(OB_NEED_RETRY, ret);
   }
   sql = "insert into test values (3, 6, 9, 12);";
   EXPECT_EQ(OB_SUCCESS, conn->prepare_statement(stmt, sql));
   EXPECT_EQ(OB_SUCCESS, conn->execute_write_async(stmt));
-  while (OB_FAIL(conn->get_conn_status())) {
+  while (OB_FAIL(conn->wait_for_async_status())) {
     EXPECT_EQ(OB_NEED_RETRY, ret);
   }
   EXPECT_EQ(OB_SUCCESS, conn->get_async_write_result(affected_rows));
   EXPECT_EQ(1, affected_rows);
   EXPECT_EQ(OB_SUCCESS, conn->rollback_async());
-  while (OB_FAIL(conn->get_conn_status())) {
+  while (OB_FAIL(conn->wait_for_async_status())) {
     EXPECT_EQ(OB_NEED_RETRY, ret);
   }
   EXPECT_EQ(OB_SUCCESS, conn->get_async_write_result(affected_rows));
@@ -147,7 +147,7 @@ TEST_F(TestAsyncOperation, basic_async_api) {
   EXPECT_EQ(OB_ERR_UNEXPECTED, conn->get_async_write_result(affected_rows));
   sql = "select * from test;";
   EXPECT_EQ(OB_ERR_UNEXPECTED, conn->execute_read(sql, res));
-  while (OB_FAIL(conn->get_conn_status())) {
+  while (OB_FAIL(conn->wait_for_async_status())) {
     EXPECT_EQ(OB_NEED_RETRY, ret);
   }
   EXPECT_EQ(OB_SUCCESS, conn->get_async_write_result(affected_rows));
@@ -222,7 +222,7 @@ TEST_F(TestAsyncOperation, async_write_performance) {
       start_time = std::chrono::high_resolution_clock::now();
       EXPECT_EQ(OB_SUCCESS, stmt.bind_param_int(0, &id));
       EXPECT_EQ(OB_SUCCESS, cur_conn->execute_write_async(stmt));
-      while (OB_FAIL(cur_conn->get_conn_status())) {
+      while (OB_FAIL(cur_conn->wait_for_async_status())) {
         EXPECT_EQ(OB_NEED_RETRY, ret);
       }
       EXPECT_EQ(OB_SUCCESS, cur_conn->get_async_write_result(affected_rows_local));

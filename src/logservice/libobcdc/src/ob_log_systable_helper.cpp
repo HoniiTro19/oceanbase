@@ -249,11 +249,9 @@ int QueryPartitionInfoStrategy::build_sql_statement(
     ret = OB_INVALID_ARGUMENT;
     LOG_ERROR("invalid argument", KR(ret), K(sql_buf), K(mul_statement_buf_len));
   } else if (OB_FAIL(databuff_printf(sql_buf, mul_statement_buf_len, pos, 
-    "SELECT SVR_IP, SVR_PORT, PARTITION_NAME FROM CDB_OB_TABLE_LOCATIONS WHERE DATABASE_NAME = '%s' AND TABLE_NAME = '%s' AND ROLE = 'LEADER'",
-      database_name_, table_name_))) {
+    "SELECT LO.SVR_IP AS SVR_IP, SE.SQL_PORT AS SQL_PORT, LO.PARTITION_NAME AS PARTITION_NAME FROM CDB_OB_TABLE_LOCATIONS LO JOIN DBA_OB_SERVERS SE ON LO.SVR_IP=SE.SVR_IP AND LO.SVR_PORT=SE.SVR_PORT WHERE LO.DATABASE_NAME = '%s' AND LO.TABLE_NAME = '%s' AND LO.ROLE = 'LEADER'", database_name_, table_name_))) {
     LOG_ERROR("build_sql_statement failed for query partition_info", KR(ret), K(pos), KCSTRING(sql_buf));
   }
-  
   return ret;
 }
 
@@ -715,18 +713,18 @@ int IObLogSysTableHelper::BatchSQLQuery::parse_record_from_row_(PartitionInfo &r
   int ret = OB_SUCCESS;
   int64_t index = -1;
   ObString svr_ip;
-  int64_t svr_port = -1;
+  int64_t sql_port = -1;
   ObString partition_name;
   int64_t partition_id = -1;
   PartitionList *partition_ids = nullptr;
   index++;
   GET_DATA(varchar, index, svr_ip, "SVR_IP");
   index++;
-  GET_DATA(int, index, svr_port, "SVR_PORT");
+  GET_DATA(int, index, sql_port, "SQL_PORT");
   index++;
   GET_DATA(varchar, index, partition_name, "PARTITION_NAME");
   ObAddr svr_addr;
-  svr_addr.set_ip_addr(svr_ip, svr_port);
+  svr_addr.set_ip_addr(svr_ip, static_cast<int32_t>(sql_port));
   ObString partition_name_prefix = partition_name.split_on('p');
   if (OB_FAIL(partition_name.get_numeric(partition_id))) {
     LOG_ERROR("get partition id failed", KR(ret));
