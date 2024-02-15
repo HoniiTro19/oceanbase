@@ -74,6 +74,14 @@ namespace testbench
   GLOBAL_OPTIONS                            \
   X(CONCURRENCY, "concurrency")             \
   X(CHAINS, "chains")                       \
+  X(END, "end")
+
+// concurrent transaction workload options macros
+#define CONCURRENT_TXN_OPTIONS              \
+  GLOBAL_OPTIONS                            \
+  X(CONCURRENCY, "concurrency")             \
+  X(OPERATIONS, "operations")               \
+  X(READONLY, "readonly")                   \
   X(END, "end")  
 
 // dataset options macros
@@ -117,6 +125,11 @@ namespace testbench
     DEADLOCK_TXN_OPTIONS
   };
 
+  enum class ConcurrentTxnOptions
+  {
+    CONCURRENT_TXN_OPTIONS
+  };
+
   enum class DatasetOptions
   {
     DATASET_OPTIONS
@@ -137,6 +150,7 @@ namespace testbench
   const char *const distributed_txn_opts[] = { DISTRIBUTED_TXN_OPTIONS };
   const char *const contention_txn_opts[] = { CONTENTION_TXN_OPTIONS };
   const char *const deadlock_txn_opts[] = { DEADLOCK_TXN_OPTIONS };
+  const char *const concurrent_txn_opts[] = { CONCURRENT_TXN_OPTIONS };
   const char *const dataset_opts[] = { DATASET_OPTIONS };
   const char *const statistics_opts[] = { STATISTICS_OPTIONS };
   const char *const connection_opts[] = { CONNECTION_OPTIONS };

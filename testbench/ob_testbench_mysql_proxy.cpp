@@ -33,13 +33,17 @@ void ObTestbenchMySQLProxy::stop() {
   TESTBENCH_LOG(INFO, "ObTestbenchMySQLProxy stop begin");
   sql_conn_pool_.stop();
   sql_conn_pool_.close_all_connection();
-  TG_STOP(tg_id_);
+  if (-1 != tg_id_) {
+    TG_STOP(tg_id_);
+  }
   TESTBENCH_LOG(INFO, "ObTestbenchMySQLProxy stop end");
 }
 
 void ObTestbenchMySQLProxy::wait() {
   TESTBENCH_LOG(INFO, "ObTestbenchMySQLProxy wait begin");
-  TG_WAIT(tg_id_);
+  if (-1 != tg_id_) { 
+    TG_WAIT(tg_id_);
+  }
   TESTBENCH_LOG(INFO, "ObTestbenchMySQLProxy wait end");
 }
 

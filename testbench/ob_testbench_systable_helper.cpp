@@ -34,7 +34,7 @@ int ObTestbenchSystableHelper::init_conn(const libobcdc::MySQLConnConfig &cfg) {
                   KR(ret), K(cfg));
   } else {
     is_inited_ = true;
-    TESTBENCH_LOG(INFO, "ObTestbenchSystableHelper init_conn success");
+    TESTBENCH_LOG(INFO, "ObTestbenchSystableHelper init_conn success", K(cfg));
   }
   return ret;
 }

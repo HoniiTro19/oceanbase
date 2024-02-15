@@ -36,6 +36,7 @@ ObIWorkloadTransactionTask::~ObIWorkloadTransactionTask()
   cumulative_latencys_.release_array();
   commits_.release_array();
   connections_.release_array();
+  pollfds_.release_array();
 }
 
 void ObIWorkloadTransactionTask::begin_trace_latency(int64_t &latency) 

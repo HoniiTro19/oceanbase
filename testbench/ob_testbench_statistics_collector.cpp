@@ -167,7 +167,8 @@ void ObStatisticsQueueTask::set_histogram_inited() {
                           ObTestbenchStatisticsCollector
 */
 ObTestbenchStatisticsCollector::ObTestbenchStatisticsCollector()
-  : is_inited_(false),
+  : tg_id_(-1),
+    is_inited_(false),
     thread_num_(1),
     task_queue_limit_(99999),
     snapshot_ready_(0),
@@ -232,21 +233,25 @@ int ObTestbenchStatisticsCollector::start() {
 
 void ObTestbenchStatisticsCollector::stop() {
   TESTBENCH_LOG(INFO, "statistics collector stop start");
-  TG_STOP(tg_id_);
+  if (-1 != tg_id_) {
+    TG_STOP(tg_id_);
+  }
   TESTBENCH_LOG(INFO, "statistics collector stop finish");
 }
 
 void ObTestbenchStatisticsCollector::wait() {
   TESTBENCH_LOG(INFO, "statistics collector wait start");
-  int64_t num = 0;
-  int ret = OB_SUCCESS;
-  while (OB_SUCC(TG_GET_QUEUE_NUM(tg_id_, num)) && num > 0) {
-    PAUSE();
+  if (-1 != tg_id_) {
+    int64_t num = 0;
+    int ret = OB_SUCCESS;
+    while (OB_SUCC(TG_GET_QUEUE_NUM(tg_id_, num)) && num > 0) {
+      PAUSE();
+    }
+    if (OB_FAIL(ret)) {
+      TESTBENCH_LOG(WARN, "statistics collector get queue number failed");
+    }
+    TG_WAIT(tg_id_);
   }
-  if (OB_FAIL(ret)) {
-    TESTBENCH_LOG(WARN, "statistics collector get queue number failed");
-  }
-  TG_WAIT(tg_id_);
   TESTBENCH_LOG(INFO, "statistics collector wait finish");
 }
 
