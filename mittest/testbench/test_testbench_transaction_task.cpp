@@ -5,6 +5,7 @@
 #include "testbench/ob_testbench_transaction_task.h"
 #include "testbench/ob_testbench_location_cache.h"
 #include "lib/random/ob_random.h"
+#include <thread>
 
 namespace oceanbase {
 namespace unittest {
@@ -177,6 +178,33 @@ TEST_F(TestTransactionTask, concurrent_transaction) {
       ASSERT_GT(cumu_latencys->at(j), 0);
     }
   }
+}
+
+TEST_F(TestTransactionTask, parallel_transaction) {
+  auto concurrent_transaction_task = [&]() {
+    int64_t transaction_count = 1000;
+    int64_t connections = 10;
+    for (int64_t i = 0; i < transaction_count; ++i) {
+      Parameters parameters;
+      Dblinks dblinks;
+      ASSERT_EQ(OB_SUCCESS, location_cache.gen_concurrent_txn_params(connections, parameters, dblinks));
+      BasicTaskConfig config { table_name, connections, &statistics_collector, &mysql_proxy, parameters, dblinks, i * 100 };
+      Readonlys readonlys;
+      readonlys.reset();
+      for (int64_t j = 0; j < connections; ++j) {
+        bool readonly = random.rand(1, 10) <= 5;
+        readonlys.push_back(readonly);
+      }
+      ObConcurrentTransactionTask concurrent_transaction_task(config, 10, readonlys);
+      ASSERT_EQ(OB_SUCCESS, concurrent_transaction_task.init());
+      ASSERT_EQ(OB_SUCCESS, concurrent_transaction_task.execute_transactions());
+      ASSERT_EQ(OB_SUCCESS, concurrent_transaction_task.release_dblinks());
+    }
+  };
+  std::thread thread1 = std::thread(concurrent_transaction_task);
+  std::thread thread2 = std::thread(concurrent_transaction_task);
+  thread1.join();
+  thread2.join();
 }
 } // unittest
 } // oceanbase
