@@ -164,7 +164,6 @@ WorkloadType ObContentionTransactionOptions::get_type() {
  */
 ObDeadlockTransactionOptions::ObDeadlockTransactionOptions(const char *opt_str)
   : ObIWorkloadOptions(opt_str),
-    partitions_(1),
     concurrency_(1),
     chains_(1)
 {}
@@ -208,6 +207,60 @@ int ObDeadlockTransactionOptions::fill_options(const char *key, const char *valu
 
 WorkloadType ObDeadlockTransactionOptions::get_type() {
   return WorkloadType::DEADLOCK;
+}
+
+/*
+ *                                      ObConcurrentTransactionOptions     
+ */
+ObConcurrentTransactionOptions::ObConcurrentTransactionOptions(const char *opt_str)
+  : ObIWorkloadOptions(opt_str),
+    concurrency_(1),
+    operations_(1),
+    readonly_(0)
+{}
+
+ObConcurrentTransactionOptions::~ObConcurrentTransactionOptions() {}
+
+int ObConcurrentTransactionOptions::fill_options(const char *key, const char *value) {
+  int ret = OB_SUCCESS;
+  if (OB_ISNULL(value)) {
+    ret = OB_INVALID_ARGUMENT;
+    TESTBENCH_LOG(ERROR, "unexpected option for deadlock transaction workload", KCSTRING(key), KCSTRING(value));
+  } else {
+    ConcurrentTxnOptions match = ConcurrentTxnOptions::END;
+    for (int64_t i = 0; i < sizeof(concurrent_txn_opts) / sizeof(concurrent_txn_opts[0]); ++i) {
+      if (0 == strcmp(concurrent_txn_opts[i], key)) {
+        match = static_cast<ConcurrentTxnOptions>(i);
+        break;
+      }
+    }
+    switch (match) {
+    case ConcurrentTxnOptions::THREADS:
+      thread_num_ = atoi(value);
+      break;
+    case ConcurrentTxnOptions::TASKS:
+      task_queue_limit_ = atoi(value);
+      break;
+    case ConcurrentTxnOptions::CONCURRENCY:
+      concurrency_ = atoi(value);
+      break;
+    case ConcurrentTxnOptions::OPERATIONS:
+      operations_ = atoi(value);
+      break;
+    case ConcurrentTxnOptions::READONLY:
+      readonly_ = atoi(value);
+      break;
+    default:
+      ret = OB_INVALID_ARGUMENT;
+      TESTBENCH_LOG(WARN, "unexpected option for concurrent transaction workload", KCSTRING(key), KCSTRING(value));
+      break;
+    }
+  }
+  return ret;
+}
+
+WorkloadType ObConcurrentTransactionOptions::get_type() {
+  return WorkloadType::CONCURRENT;
 }
 
 /*

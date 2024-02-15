@@ -29,6 +29,7 @@ public:
     conn_pool_config.connection_pool_warn_time_ = 60L * 1000L * 1000L;
     conn_pool_config.long_query_timeout_ = sql_query_timeout_us;
     conn_pool_config.sqlclient_per_observer_conn_limit_ = 500;
+    conn_pool_config.trx_timeout_ = 100L * 1000 * 1000;
   }
   virtual void Tear() {}
 

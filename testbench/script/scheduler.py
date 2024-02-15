@@ -89,7 +89,8 @@ class SchedulerManager(Manager):
                 "statistics": "-s",
                 "distributed": "-T",
                 "contention": "-C",
-                "deadlock": "-D"
+                "deadlock": "-D",
+                "concurrent": "-M"
             }
         )
         cmds = []

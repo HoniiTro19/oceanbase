@@ -424,6 +424,7 @@ class BenchLoadCommand(TestBenchCommand):
 
     def _do_command(self, tb):
         self._do_step("Generating datasets for the benchmark table.", tb.generate_dataset)
+        self._do_step("Clearing schemas for the benchmark table.", tb.clear_schema)
         self._do_step("Creating schemas for the benchmark table.", tb.generate_schema)
         self._do_step("Loading datasets into the benchmark table.", tb.load_dataset)
         
@@ -435,6 +436,12 @@ class BenchTestCommand(TestBenchCommand):
         )
         self.parser.add_option(
             "-c", "--config", type="string", help="Path to the configuration file."
+        )
+        self.parser.add_option(
+            "-e", "--elr", action="store_true", default=False, help="Need to use elr during benchmarking."
+        )
+        self.parser.add_option(
+            "-l", "--lcl", action="store_true", default=False, help="Need to use lcl during benchmarking."
         )
     
     def _check(self):
@@ -449,7 +456,17 @@ class BenchTestCommand(TestBenchCommand):
         return True
 
     def _do_command(self, tb):
+        need_elr = getattr(self.opts, "elr", False)
+        need_lcl = getattr(self.opts, "lcl", False)
+        if need_elr:
+            self._do_step("Enabling elr for contention transactions.", tb.enable_elr)
+        if need_lcl:
+            self._do_step("Enabling lcl for deadlock transactions.", tb.enable_lcl)
         self._do_step("Starting testbench scheduler.", tb.start_scheduler)
+        if need_elr:
+            self._do_step("Disabling elr for contention transactions.", tb.reset_elr)
+        if need_lcl:
+            self._do_step("Disabling lcl for deadlock transactions.", tb.reset_lcl)
 
 
 class ReportMajorCommand(MajorCommand):

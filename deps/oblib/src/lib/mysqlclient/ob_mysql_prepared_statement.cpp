@@ -134,7 +134,7 @@ int ObMySQLPreparedStatement::execute_update_async()
   } else if (OB_FAIL(param_.bind_param())) {
     LOG_WARN("bind prepared input param fail", K(ret));
   } else if (OB_LIKELY(conn_->async_status_ = mysql_stmt_execute_start(&conn_->mysql_int_err_, stmt_))) {
-    conn_->cur_cont_func_ = ContFuncDefID::CONT_FUNC_STMT_UPDATE;
+    conn_->cur_cont_func_ = ContFuncDefID::CONT_FUNC_STMT_QUERY;
     conn_->conn_status_ = ObMySQLConnection::ConnStatus::PENDING;
   } else if (OB_UNLIKELY(conn_->mysql_int_err_)) {
     ret = -mysql_stmt_errno(stmt_);
@@ -176,11 +176,16 @@ int ObMySQLPreparedStatement::get_async_read_result(ObMySQLResult *&result)
     LOG_ERROR("stmt handler is null", K(ret));
   } else if (OB_FAIL(result_.bind_result_param())) {
     LOG_WARN("bind result param fail", K(ret));
-  } else if (OB_UNLIKELY(0 != mysql_stmt_store_result(stmt_))) {
+  } else if (OB_LIKELY(conn_->async_status_ = mysql_stmt_store_result_start(&conn_->mysql_int_err_, stmt_))) {
+    conn_->cur_cont_func_ = ContFuncDefID::CONT_FUNC_STMT_STORE;
+    conn_->conn_status_ = ObMySQLConnection::ConnStatus::PENDING;
+  } else if (OB_UNLIKELY(conn_->mysql_int_err_)) {
     ret = -mysql_stmt_errno(stmt_);
-    LOG_WARN("fail to store async prepared result", "info", mysql_stmt_error(stmt_), K(ret));
+    conn_->conn_status_ = ObMySQLConnection::ConnStatus::ERROR;
+    LOG_WARN("stmt store result failed", "info", mysql_stmt_error(stmt_), K(ret));
   } else {
     result = &result_;
+    conn_->conn_status_ = ObMySQLConnection::ConnStatus::SUCCESS;
   }
   return ret;
 }

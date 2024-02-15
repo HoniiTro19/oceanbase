@@ -34,7 +34,7 @@ int ObTestbenchSystableHelper::init_conn(const libobcdc::MySQLConnConfig &cfg) {
                   KR(ret), K(cfg));
   } else {
     is_inited_ = true;
-    TESTBENCH_LOG(INFO, "ObTestbenchSystableHelper init_conn success");
+    TESTBENCH_LOG(INFO, "ObTestbenchSystableHelper init_conn success", K(cfg));
   }
   return ret;
 }
@@ -350,6 +350,8 @@ int ObTestbenchSystableHelper::query_tenant_list(
   BatchSQLQuery query;
   libobcdc::QueryAllTenantStrategy query_all_tenant_strategy;
   common::ObSEArray<TenantInfo, 16> tenant_info_list;
+  tenant_id_list.reset();
+  tenant_name_list.reset();
 
   if (IS_NOT_INIT) {
     ret = OB_NOT_INIT;

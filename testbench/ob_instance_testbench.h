@@ -33,6 +33,7 @@ static void print_help() {
   MPRINT("-T, --distributed, option string of distributed transaction workload, for example threads=50,tasks=100,participants=1,operations=10");
   MPRINT("-C, --contention, option string of contention workload, for example threads=50,tasks=100,concurrency=1,operations=10,aborts=0");
   MPRINT("-D, --deadlock, option string of deadlock workload, for example threads=50,tasks=100,concurrency=2,chains=2");
+  MPRINT("-M, --concurrent, option string of concurrent workload, for example threads=50,tasks=100,concurrency=2,operations=10,readonly=50");
 }
 
 static bool to_int64(const char *sval, int64_t &ival) {
@@ -77,6 +78,7 @@ static void get_opts_setting(struct option long_opts[], char short_opts[], const
       {"distributed", 'T', 1},
       {"contention", 'C', 1},
       {"deadlock", 'D', 1},
+      {"concurrent", 'M', 1},
   };
   size_t opts_cnt = sizeof(tb_opts) / sizeof(tb_opts[0]);
 
@@ -185,6 +187,18 @@ parse_short_opt(const int c, const char *value, ObTestbenchOptions &opts) {
       MPRINTx("generate deadlock transaction options error: %s", value);
     } else if (OB_FAIL(opts.workloads_opts_.push_back(options))) {
       MPRINTx("push back deadlock transaction options error: %s", value);
+    } else {
+      opts.workload_opts_cnt_ += 1;
+    }
+  }
+    break;
+  case 'M': {
+    MPRINT("concurrent transaction options: %s", value);
+    ObConcurrentTransactionOptions *options = nullptr;
+    if (OB_ISNULL(options = OB_NEW(ObConcurrentTransactionOptions, ObModIds::OB_TESTBENCH_OPTIONS, value))) {
+      MPRINTx("generate concurrent transaction options error: %s", value);
+    } else if (OB_FAIL(opts.workloads_opts_.push_back(options))) {
+      MPRINTx("push back concurrent transaction options error: %s", value);
     } else {
       opts.workload_opts_cnt_ += 1;
     }

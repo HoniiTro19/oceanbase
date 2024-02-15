@@ -71,13 +71,17 @@ int ObTestbenchTransactionExecutorPool::start() {
 
 void ObTestbenchTransactionExecutorPool::stop() {
   TESTBENCH_LOG(INFO, "ObTestbenchTransactionExecutorPool stop begin");
-  TG_STOP(tg_id_);
+  if (-1 != tg_id_) {
+    TG_STOP(tg_id_);
+  }
   TESTBENCH_LOG(INFO, "ObTestbenchTransactionExecutorPool stop end");
 }
 
 void ObTestbenchTransactionExecutorPool::wait() {
   TESTBENCH_LOG(INFO, "ObTestbenchTransactionExecutorPool wait begin");
-  TG_WAIT(tg_id_);
+  if (-1 != tg_id_) {
+    TG_WAIT(tg_id_);
+  }
   TESTBENCH_LOG(INFO, "ObTestbenchTransactionExecutorPool wait end");
 }
 

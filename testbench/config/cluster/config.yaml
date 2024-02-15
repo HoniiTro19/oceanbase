@@ -3,11 +3,11 @@ instance_observer:
     devname: lo
     cluster_id: 1
     # please set memory limit to a suitable value which is matching resource. 
-    memory_limit: 6G # The maximum running memory for an observer
-    system_memory: 1G # The reserved system memory. system_memory is reserved for general tenants. The default value is 30G.
-    datafile_size: 16G # Size of the data file. 
-    log_disk_size: 16G # The size of disk space used by the clog files.
-    cpu_count: 2
+    memory_limit: 32G # The maximum running memory for an observer
+    system_memory: 14G # The reserved system memory. system_memory is reserved for general tenants. The default value is 30G.
+    datafile_size: 80G # Size of the data file. 
+    log_disk_size: 80G # The size of disk space used by the clog files.
+    cpu_count: 8
     production_mode: false
     syslog_level: INFO # System log level. The default value is INFO.
     enable_syslog_wf: false # Print system logs whose levels are higher than WARNING to a separate log file. The default value is true.
@@ -15,10 +15,10 @@ instance_observer:
     max_syslog_file_count: 4 # The maximum number of reserved log files before enabling auto recycling. The default value is 0.
     # root_password: # root user password, can be empty
     __min_full_resource_pool_memory: 1073741824
-    home_path: /data/cluster
+    home_path: /data/homedata/zhd/cluster
   server1:
-    mysql_port: 2881 # External port for OceanBase Database. The default value is 2881. DO NOT change this value after the cluster is started.
-    rpc_port: 2882 # Internal port for OceanBase Database. The default value is 2882. DO NOT change this value after the cluster is started.
+    mysql_port: 28801 # External port for OceanBase Database. The default value is 2881. DO NOT change this value after the cluster is started.
+    rpc_port: 28802 # Internal port for OceanBase Database. The default value is 2882. DO NOT change this value after the cluster is started.
     #  The working directory for OceanBase Database. OceanBase Database is started under this directory. This is a required field.
     # The directory for data storage. The default value is $home_path/store.
     # data_dir: /data
@@ -26,8 +26,8 @@ instance_observer:
     # redo_dir: /redo
     zone: zone1
   server2:
-    mysql_port: 2883 # External port for OceanBase Database. The default value is 2881. DO NOT change this value after the cluster is started.
-    rpc_port: 2884 # Internal port for OceanBase Database. The default value is 2882. DO NOT change this value after the cluster is started.
+    mysql_port: 28803 # External port for OceanBase Database. The default value is 2881. DO NOT change this value after the cluster is started.
+    rpc_port: 28804 # Internal port for OceanBase Database. The default value is 2882. DO NOT change this value after the cluster is started.
     #  The working directory for OceanBase Database. OceanBase Database is started under this directory. This is a required field.
     # The directory for data storage. The default value is $home_path/store.
     # data_dir: /data
@@ -35,8 +35,8 @@ instance_observer:
     # redo_dir: /redo
     zone: zone2
   server3:
-    mysql_port: 2885 # External port for OceanBase Database. The default value is 2881. DO NOT change this value after the cluster is started.
-    rpc_port: 2886 # Internal port for OceanBase Database. The default value is 2882. DO NOT change this value after the cluster is started.
+    mysql_port: 28805 # External port for OceanBase Database. The default value is 2881. DO NOT change this value after the cluster is started.
+    rpc_port: 28806 # Internal port for OceanBase Database. The default value is 2882. DO NOT change this value after the cluster is started.
     #  The working directory for OceanBase Database. OceanBase Database is started under this directory. This is a required field.
     # The directory for data storage. The default value is $home_path/store.
     # data_dir: /data

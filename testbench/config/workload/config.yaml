@@ -23,7 +23,7 @@ instance_testbench:
   dataset:
     # for dataset parameteres
     partitions: 9
-    rows: 3000
+    rows: 1000000
   distributed:
     threads: 10
     tasks: 99999

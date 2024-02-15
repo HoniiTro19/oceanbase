@@ -118,7 +118,9 @@ public:
   static const char *const DEFAULT_DB_USER;
   static const char *const DEFAULT_DB_PASS;
   static const char *const DEFAULT_DB_NAME;
-  static const int64_t DEFAULT_TRANSACTION_TIMEOUT_US = 100 * 1000 * 1000;
+  static const int64_t DEFAULT_WAIT_TIMEOUT_US = 10;
+  static const int64_t DEFAULT_QUERY_TIMEOUT_US = 10L * 1000 * 1000;
+  static const int64_t DEFAULT_TRANSACTION_TIMEOUT_US = 100L * 1000 * 1000;
 public:
   ObMySQLConnectionPool();
   ~ObMySQLConnectionPool();

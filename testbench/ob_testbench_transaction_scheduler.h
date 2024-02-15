@@ -34,20 +34,16 @@ public:
   void wait();
   void destroy();
   virtual void run1() override;
-  void generate_distributed_txn_task();
-  void generate_contention_txn_task();
-  void generate_deadlock_txn_task();
-
-private:
-  int get_dblink_ids();
+  int generate_distributed_txn_task();
+  int generate_contention_txn_task();
+  int generate_deadlock_txn_task();
+  int generate_concurrent_txn_task();
 
 private:
   int tg_id_;
   bool is_inited_;
   WorkloadType txn_type_;
-  int64_t cur_partition_id_;
   int64_t cur_row_id_;
-  int64_t cur_conn_id_;
   const char *table_name_;
   ObTestbenchMySQLProxy *mysql_proxy_;
   ObTestbenchLocationCache location_cache_;
@@ -55,8 +51,8 @@ private:
   ObTestbenchStatisticsCollector *statistics_collector_;
   ObIWorkloadOptions *workload_options_;
   ObDatasetOptions *dataset_options_;
-  common::ObArray<uint64_t> dblink_ids_;
   ObArenaAllocator allocator_;
+  ObRandom random_;
 };
 } // namespace testbench
 } // namesapce oceanbase

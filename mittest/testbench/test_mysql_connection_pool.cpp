@@ -203,6 +203,9 @@ TEST_F(TestMySQLConnectionPool, dblink_pool_performance) {
 
 int main(int argc, char **argv) {
   ::testing::InitGoogleTest(&argc, argv);
-  OB_LOGGER.set_log_level("ERROR");
+  const char *file_name = "test_mysql_connection_pool.log";
+  OB_LOGGER.set_log_level("INFO");
+  remove(file_name);
+  OB_LOGGER.set_file_name(file_name, true, false);
   return RUN_ALL_TESTS();
 }

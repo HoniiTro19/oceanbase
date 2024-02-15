@@ -113,11 +113,12 @@ ObMySQLConnectionPool::ObMySQLConnectionPool()
   }
 
   // set defult values
-  config_.sqlclient_wait_timeout_ = 10;             // 10s
-  config_.long_query_timeout_ = 120*1000*1000;      // 120s
-  config_.connection_refresh_interval_ = 200*1000;  // 200ms
-  config_.connection_pool_warn_time_ = 1*1000*1000; // 1s
-  config_.sqlclient_per_observer_conn_limit_ = 256; // dblink connection limits is 256
+  config_.sqlclient_wait_timeout_ = DEFAULT_WAIT_TIMEOUT_US;    // 10s
+  config_.long_query_timeout_ = DEFAULT_QUERY_TIMEOUT_US;       // 10s
+  config_.connection_refresh_interval_ = 200 * 1000;            // 200ms
+  config_.connection_pool_warn_time_ = 1 * 1000 * 1000;         // 1s
+  config_.sqlclient_per_observer_conn_limit_ = 256;             // dblink connection limits is 256
+  config_.trx_timeout_ = DEFAULT_TRANSACTION_TIMEOUT_US;        // 100s
 }
 
 ObMySQLConnectionPool::~ObMySQLConnectionPool()
@@ -512,7 +513,9 @@ int ObMySQLConnectionPool::try_connect(ObMySQLConnection *connection)
     ret = OB_INVALID_ARGUMENT;
     LOG_WARN("connection must not null", K(ret));
   } else if (connection->is_closed()) {
-    connection->set_timeout(config_.sqlclient_wait_timeout_);
+    connection->set_timeout(
+      config_.sqlclient_wait_timeout_ > 0 ? config_.sqlclient_wait_timeout_ : DEFAULT_WAIT_TIMEOUT_US
+    );
     if (OB_FAIL(connection->connect(db_user_, db_pass_, db_name_, is_use_ssl_))) {
       LOG_WARN("fail to connect to server",
                K(connection->get_server()), K(ret));
@@ -535,8 +538,8 @@ int ObMySQLConnectionPool::try_connect(ObMySQLConnection *connection)
         connection->set_read_consistency_strong();
       } else {
         if (OB_FAIL(connection->set_timeout_variable(
-                  config_.long_query_timeout_,
-                  DEFAULT_TRANSACTION_TIMEOUT_US))) {
+          config_.long_query_timeout_ > 0 ? config_.long_query_timeout_ : DEFAULT_QUERY_TIMEOUT_US,
+          config_.trx_timeout_ > 0 ? config_.trx_timeout_ : DEFAULT_TRANSACTION_TIMEOUT_US))) {
           LOG_WARN("fail to set mysql timeout variablse", K(ret));
           if (ObMySQLConnection::DEBUG_MODE == mode_) {
             ret = OB_SUCCESS;
@@ -914,12 +917,15 @@ int ObMySQLConnectionPool::try_connect_dblink(ObMySQLConnection *dblink_conn, in
     ret = OB_INVALID_ARGUMENT;
     LOG_WARN("dblink conn is NULL", K(ret));
   } else if (dblink_conn->is_closed()) {
-    dblink_conn->set_timeout(config_.sqlclient_wait_timeout_);
+    dblink_conn->set_timeout(
+      config_.sqlclient_wait_timeout_ > 0 ? config_.sqlclient_wait_timeout_ : DEFAULT_WAIT_TIMEOUT_US
+    );
     LOG_TRACE("set dblink timeout and sql request level", K(sql_request_level), K(config_.sqlclient_wait_timeout_), K(lbt()), K(ret));
     if (OB_FAIL(dblink_conn->connect_dblink(is_use_ssl_, sql_request_level, async))) {
       LOG_WARN("fail to connect dblink", K(dblink_conn->get_server()), K(ret));
-    } else if (OB_FAIL(dblink_conn->set_timeout_variable(config_.long_query_timeout_,
-                                                         DEFAULT_TRANSACTION_TIMEOUT_US))) {
+    } else if (OB_FAIL(dblink_conn->set_timeout_variable(
+      config_.long_query_timeout_ > 0 ? config_.long_query_timeout_ : DEFAULT_QUERY_TIMEOUT_US,
+      config_.trx_timeout_ > 0 ? config_.trx_timeout_ : DEFAULT_TRANSACTION_TIMEOUT_US))) {
       LOG_WARN("fail to set mysql timeout variablse", K(ret));
       dblink_conn->close();
     }

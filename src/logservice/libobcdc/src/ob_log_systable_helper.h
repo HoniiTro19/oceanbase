@@ -206,7 +206,7 @@ public:
   typedef common::ObSEArray<share::ObLSID, DEFAULT_RECORDS_NUM> TenantLSIDs;
 
   typedef common::ObArray<int64_t> PartitionList;
-  typedef common::hash::ObHashMap<ObString, PartitionList*> PartitionInfo;
+  typedef common::hash::ObHashMap<ObAddr, PartitionList*> PartitionInfo;
 
 public:
   virtual ~IObLogSysTableHelper() { }

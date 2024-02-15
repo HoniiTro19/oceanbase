@@ -122,7 +122,8 @@ public:
   int start_transaction_async(bool with_snap_shot = false);
   int rollback_async();
   int commit_async();
-  int get_conn_status();
+  int wait_for_async_status(int timeout = -1);
+  inline ConnStatus get_conn_status() { return conn_status_; }
 
   // session environment
   virtual int get_session_variable(const ObString &name, int64_t &val) override;
@@ -155,11 +156,14 @@ public:
 
   // dblink.
   virtual int connect_dblink(const bool use_ssl, int64_t sql_request_level, bool async = false);
+  int get_async_status() const; 
+  void set_async_status(int async_status);
+  int run_contfunc_and_update_status();
 
 private:
   int switch_tenant(const uint64_t tenant_id);
   int reset_read_consistency();
-  int wait_for_mysql();
+  int wait_for_mysql(int timeout = -1);
 
 private:
   const static int64_t READ_CONSISTENCY_STRONG = 3;
@@ -194,6 +198,8 @@ private:
   DISALLOW_COPY_AND_ASSIGN(ObMySQLConnection);
 };
 
+inline int ObMySQLConnection::get_async_status() const { return async_status_; }
+inline void ObMySQLConnection::set_async_status(int async_status) { async_status_ = async_status; }
 inline bool ObMySQLConnection::is_busy() const { return busy_; }
 inline void ObMySQLConnection::set_busy(const bool busy) { busy_ = busy; }
 inline bool ObMySQLConnection::is_closed() const { return closed_; }
@@ -215,10 +221,12 @@ class ObContFunc {
 public:
   ObContFunc(ObMySQLConnection *conn) : conn_(conn) {}
   virtual ~ObContFunc() {}
-  virtual int run_func() = 0;
-  int update_begin_status();
-  int update_commit_status();
+  virtual void run_func() = 0;
+  virtual int update_status() = 0;
+  int update_bool_status();
+  int update_int_status();
   int update_stmt_status();
+  int update_mysql_status();
 
 protected:
   ObMySQLConnection *conn_;
@@ -229,56 +237,56 @@ class ObConnectContFunc : public ObContFunc {
 public:
   ObConnectContFunc(ObMySQLConnection *conn) : ObContFunc(conn) {}
   virtual ~ObConnectContFunc() {}
-  virtual int run_func() override;
+  virtual void run_func() override;
+  virtual int update_status() override;
 };
 
 class ObQueryContFunc : public ObContFunc {
 public:
   ObQueryContFunc(ObMySQLConnection *conn) : ObContFunc(conn) {}
   virtual ~ObQueryContFunc() {}
-  virtual int run_func() override;
-};
-
-class ObUpdateContFunc : public ObContFunc {
-public:
-  ObUpdateContFunc(ObMySQLConnection *conn) : ObContFunc(conn) {}
-  virtual ~ObUpdateContFunc() {}
-  virtual int run_func() override;
+  virtual void run_func() override;
+  virtual int update_status() override;
 };
 
 class ObStmtQueryContFunc : public ObContFunc {
 public:
   ObStmtQueryContFunc(ObMySQLConnection *conn) : ObContFunc(conn) {}
   virtual ~ObStmtQueryContFunc() {}
-  virtual int run_func() override;
+  virtual void run_func() override;
+  virtual int update_status() override;
 };
 
-class ObStmtUpdateContFunc : public ObContFunc {
+class ObStmtStoreContFunc : public ObContFunc {
 public:
-  ObStmtUpdateContFunc(ObMySQLConnection *conn) : ObContFunc(conn) {}
-  virtual ~ObStmtUpdateContFunc() {}
-  virtual int run_func() override;
+  ObStmtStoreContFunc(ObMySQLConnection *conn) : ObContFunc(conn) {}
+  virtual ~ObStmtStoreContFunc() {}
+  virtual void run_func() override;
+  virtual int update_status() override;
 };
 
 class ObStartContFunc : public ObContFunc {
 public:
   ObStartContFunc(ObMySQLConnection *conn) : ObContFunc(conn) {}
   virtual ~ObStartContFunc() {}
-  virtual int run_func() override;
+  virtual void run_func() override;
+  virtual int update_status() override;
 };
 
 class ObCommitContFunc : public ObContFunc {
 public:
   ObCommitContFunc(ObMySQLConnection *conn) : ObContFunc(conn) {}
   virtual ~ObCommitContFunc() {}
-  virtual int run_func() override;
+  virtual void run_func() override;
+  virtual int update_status() override;
 };
 
 class ObRollbackContFunc : public ObContFunc {
 public:
   ObRollbackContFunc(ObMySQLConnection *conn) : ObContFunc(conn) {}
   virtual ~ObRollbackContFunc() {}
-  virtual int run_func() override;
+  virtual void run_func() override;
+  virtual int update_status() override;
 };
 } // namespace sqlclient
 } // namespace common

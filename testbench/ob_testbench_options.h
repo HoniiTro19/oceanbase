@@ -91,15 +91,31 @@ namespace oceanbase
       virtual ~ObDeadlockTransactionOptions() override;
       virtual int fill_options(const char *key, const char *value) override;
       virtual WorkloadType get_type() override;
-      inline int64_t get_partitions() { return partitions_; }
       inline int64_t get_concurrency() { return concurrency_; }
       inline int64_t get_chains() { return chains_; }
-      INHERIT_TO_STRING_KV("ObIWorkloadOptions", ObIWorkloadOptions, K_(partitions), K_(concurrency), K_(chains));
+      INHERIT_TO_STRING_KV("ObIWorkloadOptions", ObIWorkloadOptions, K_(concurrency), K_(chains));
     
     private:
-      int64_t partitions_;
       int64_t concurrency_;
       int64_t chains_;
+    };
+
+    class ObConcurrentTransactionOptions : public ObIWorkloadOptions
+    {
+    public:
+      ObConcurrentTransactionOptions(const char *opt_str);
+      virtual ~ObConcurrentTransactionOptions() override;
+      virtual int fill_options(const char *key, const char *value) override;
+      virtual WorkloadType get_type() override;
+      inline int64_t get_concurrency() { return concurrency_; }
+      inline int64_t get_operations() { return operations_; }
+      inline int64_t get_readonly() { return readonly_; }
+      INHERIT_TO_STRING_KV("ObIWorkloadOptions", ObIWorkloadOptions, K_(concurrency), K_(operations), K_(readonly));
+      
+    private:
+      int64_t concurrency_;
+      int64_t operations_;
+      int64_t readonly_;
     };
 
     class ObDatasetOptions : public ObIOptions

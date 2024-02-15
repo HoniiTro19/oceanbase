@@ -87,7 +87,7 @@ class TestBench(object):
 
     def _create_workspace(self):
         def mkdir_workspace(name, server):
-            if not DirectoryUtil.mkdir(server.get_conf("work_space")):
+            if not DirectoryUtil.mkdir(server.get_conf("work_space"), 0o755, self.stdio):
                 self.stdio.error(
                     "Fail to make work space directory for {}".format(name)
                 )
@@ -397,14 +397,14 @@ class TestBench(object):
             return False
         return self.dataset_manager.generate_dataset()
     
-    def _clear_schema(self):
+    def clear_schema(self):
         rs = self.cluster_manager.root_service
         cursor = MySQLClient.connect(rs, user="root@{}".format(self._tenant_name), database=self._database_name, stdio=self.stdio)
         if not cursor:
             self.stdio.error("Fail to get database connection.")
             return False
-        rm_table_sql = 'DROP TABLE {} IF EXISTS'.format(self._table_name)
-        rm_tg_sql = 'DROP TABLEGROUP {} IF EXISTS'.format(self._tg_name)
+        rm_table_sql = 'DROP TABLE IF EXISTS {}'.format(self._table_name)
+        rm_tg_sql = 'DROP TABLEGROUP IF EXISTS {}'.format(self._tg_name)
         try:
             self.stdio.verbose("drop table - {}".format(rm_table_sql))
             result = cursor.execute(rm_table_sql)
@@ -450,9 +450,10 @@ class TestBench(object):
         CREATE TABLE IF NOT EXISTS {} (
             partition_id BIGINT NOT NULL,
             row_id BIGINT NOT NULL,
-            lock_txn BIGINT NOT NULL,
+            lock_dist BIGINT NOT NULL,
             lock_elr BIGINT NOT NULL,
             lock_lcl BIGINT NOT NULL,
+            lock_txn BIGINT NOT NULL,
             PRIMARY KEY(partition_id, row_id)
         ) TABLEGROUP = 'tb_group' PARTITION BY HASH (partition_id) PARTITIONS {}
         '''.format(self._table_name, partitions)
@@ -480,6 +481,7 @@ class TestBench(object):
             return False
         secure_file_sql = 'SET GLOBAL SECURE_FILE_PRIV = ""'
         grant_user_sql = 'GRANT FILE ON *.* TO {}'.format(self._tenant_name)
+        set_timeout_sql = 'SET SESSION ob_query_timeout = {}'.format(100 * 1000 * 1000)
         load_data_sql = 'LOAD DATA /*+ direct(true, 1024) parallel(16) */ INFILE "{}" INTO TABLE {} FIELDS TERMINATED BY ","'.format(self.dataset_manager.dataset_path, self._table_name)
         partitions = self.dataset_manager.dataset_config["partitions"]
         rows = self.dataset_manager.dataset_config["rows"]
@@ -494,6 +496,16 @@ class TestBench(object):
             if result != 0:
                 self.stdio.error("Fail to grant user.")
                 return False
+            # refresh connection
+            cursor = MySQLClient.connect(rs, user="root@{}".format(self._tenant_name), database=self._database_name, stdio=self.stdio)
+            if not cursor:
+                self.stdio.error("Fail to get tenant database connection.")
+                return False
+            self.stdio.verbose("set timeout - {}".format(set_timeout_sql))
+            result = cursor.execute(set_timeout_sql)
+            if result != 0:
+                self.stdio.error("Fail to set session query timeout.")
+                return False
             self.stdio.verbose("load data - {}".format(load_data_sql))
             result = cursor.execute(load_data_sql)
             if result != partitions * rows:
@@ -501,5 +513,89 @@ class TestBench(object):
                 return False
         except MySQL.DatabaseError as e:
             self.stdio.error("load data exception {}".format(e.args))
+            return False
+        return True
+    
+    def enable_elr(self):
+        rs = self.cluster_manager.root_service
+        cursor = MySQLClient.connect(rs, user="root@sys", database="oceanbase", stdio=self.stdio)
+        if not cursor:
+            self.stdio.error("Fail to get database connection.")
+            return False
+        set_dependent_trx_count_sql = 'ALTER SYSTEM SET _max_elr_dependent_trx_count = 1000'
+        enable_elr_sql = 'ALTER SYSTEM SET enable_early_lock_release = true tenant={}'.format(self._tenant_name)
+        try:
+            self.stdio.verbose("set dependent transaction count - {}".format(set_dependent_trx_count_sql))
+            result = cursor.execute(set_dependent_trx_count_sql)
+            if result != 0:
+                self.stdio.error("Fail to set dependent transaction count.")
+                return False
+            self.stdio.verbose("enable early lock release - {}".format(enable_elr_sql))
+            result = cursor.execute(enable_elr_sql)
+            if result != 0:
+                self.stdio.error("Fail to enable early lock release.")
+                return False
+        except MySQL.DatabaseError as e:
+            self.stdio.error("set elr exception {}".format(e.args))
+            return False
+        return True
+    
+    def reset_elr(self):
+        rs = self.cluster_manager.root_service
+        cursor = MySQLClient.connect(rs, user="root@sys", database="oceanbase", stdio=self.stdio)
+        if not cursor:
+            self.stdio.error("Fail to get database connection.")
+            return False
+        reset_dependent_trx_count_sql = 'ALTER SYSTEM SET _max_elr_dependent_trx_count = 0'
+        disable_elr_sql = 'ALTER SYSTEM SET enable_early_lock_release = false tenant={}'.format(self._tenant_name)
+        try:
+            self.stdio.verbose("reset dependent transaction count - {}".format(reset_dependent_trx_count_sql))
+            result = cursor.execute(reset_dependent_trx_count_sql)
+            if result != 0:
+                self.stdio.error("Fail to reset dependent transaction count.")
+                return False
+            self.stdio.verbose("disable early lock release - {}".format(disable_elr_sql))
+            result = cursor.execute(disable_elr_sql)
+            if result != 0:
+                self.stdio.error("Fail to disable early lock release.")
+                return False
+        except MySQL.DatabaseError as e:
+            self.stdio.error("disable elr exception {}".format(e.args))
+            return False
+        return True
+    
+    def enable_lcl(self):
+        rs = self.cluster_manager.root_service
+        cursor = MySQLClient.connect(rs, user="root@sys", database="oceanbase", stdio=self.stdio)
+        if not cursor:
+            self.stdio.error("Fail to get database connection.")
+            return False
+        set_lcl_interval_sql = 'ALTER SYSTEM SET _lcl_op_interval = "25ms"'
+        try:
+            self.stdio.verbose("set lcl operation interval - {}".format(set_lcl_interval_sql))
+            result = cursor.execute(set_lcl_interval_sql)
+            if result != 0:
+                self.stdio.error("Fail to set lcl operation interval.")
+                return False
+        except MySQL.DatabaseError as e:
+            self.stdio.error("enable lcl exception {}".format(e.args))
+            return False
+        return True
+    
+    def reset_lcl(self):
+        rs = self.cluster_manager.root_service
+        cursor = MySQLClient.connect(rs, user="root@sys", database="oceanbase", stdio=self.stdio)
+        if not cursor:
+            self.stdio.error("Fail to get database connection.")
+            return False
+        reset_lcl_interval_sql = 'ALTER SYSTEM SET _lcl_op_interval = "0ms"'
+        try:
+            self.stdio.verbose("reset lcl operation interval - {}".format(reset_lcl_interval_sql))
+            result = cursor.execute(reset_lcl_interval_sql)
+            if result != 0:
+                self.stdio.error("Fail to reset lcl operation interval.")
+                return False
+        except MySQL.DatabaseError as e:
+            self.stdio.error("enable lcl exception {}".format(e.args))
             return False
         return True
