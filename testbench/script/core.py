@@ -515,3 +515,87 @@ class TestBench(object):
             self.stdio.error("load data exception {}".format(e.args))
             return False
         return True
+    
+    def enable_elr(self):
+        rs = self.cluster_manager.root_service
+        cursor = MySQLClient.connect(rs, user="root@sys", database="oceanbase", stdio=self.stdio)
+        if not cursor:
+            self.stdio.error("Fail to get database connection.")
+            return False
+        set_dependent_trx_count_sql = 'ALTER SYSTEM SET _max_elr_dependent_trx_count = 1000'
+        enable_elr_sql = 'ALTER SYSTEM SET enable_early_lock_release = true tenant={}'.format(self._tenant_name)
+        try:
+            self.stdio.verbose("set dependent transaction count - {}".format(set_dependent_trx_count_sql))
+            result = cursor.execute(set_dependent_trx_count_sql)
+            if result != 0:
+                self.stdio.error("Fail to set dependent transaction count.")
+                return False
+            self.stdio.verbose("enable early lock release - {}".format(enable_elr_sql))
+            result = cursor.execute(enable_elr_sql)
+            if result != 0:
+                self.stdio.error("Fail to enable early lock release.")
+                return False
+        except MySQL.DatabaseError as e:
+            self.stdio.error("set elr exception {}".format(e.args))
+            return False
+        return True
+    
+    def reset_elr(self):
+        rs = self.cluster_manager.root_service
+        cursor = MySQLClient.connect(rs, user="root@sys", database="oceanbase", stdio=self.stdio)
+        if not cursor:
+            self.stdio.error("Fail to get database connection.")
+            return False
+        reset_dependent_trx_count_sql = 'ALTER SYSTEM SET _max_elr_dependent_trx_count = 0'
+        disable_elr_sql = 'ALTER SYSTEM SET enable_early_lock_release = false tenant={}'.format(self._tenant_name)
+        try:
+            self.stdio.verbose("reset dependent transaction count - {}".format(reset_dependent_trx_count_sql))
+            result = cursor.execute(reset_dependent_trx_count_sql)
+            if result != 0:
+                self.stdio.error("Fail to reset dependent transaction count.")
+                return False
+            self.stdio.verbose("disable early lock release - {}".format(disable_elr_sql))
+            result = cursor.execute(disable_elr_sql)
+            if result != 0:
+                self.stdio.error("Fail to disable early lock release.")
+                return False
+        except MySQL.DatabaseError as e:
+            self.stdio.error("disable elr exception {}".format(e.args))
+            return False
+        return True
+    
+    def enable_lcl(self):
+        rs = self.cluster_manager.root_service
+        cursor = MySQLClient.connect(rs, user="root@sys", database="oceanbase", stdio=self.stdio)
+        if not cursor:
+            self.stdio.error("Fail to get database connection.")
+            return False
+        set_lcl_interval_sql = 'ALTER SYSTEM SET _lcl_op_interval = "25ms"'
+        try:
+            self.stdio.verbose("set lcl operation interval - {}".format(set_lcl_interval_sql))
+            result = cursor.execute(set_lcl_interval_sql)
+            if result != 0:
+                self.stdio.error("Fail to set lcl operation interval.")
+                return False
+        except MySQL.DatabaseError as e:
+            self.stdio.error("enable lcl exception {}".format(e.args))
+            return False
+        return True
+    
+    def reset_lcl(self):
+        rs = self.cluster_manager.root_service
+        cursor = MySQLClient.connect(rs, user="root@sys", database="oceanbase", stdio=self.stdio)
+        if not cursor:
+            self.stdio.error("Fail to get database connection.")
+            return False
+        reset_lcl_interval_sql = 'ALTER SYSTEM SET _lcl_op_interval = "0ms"'
+        try:
+            self.stdio.verbose("reset lcl operation interval - {}".format(reset_lcl_interval_sql))
+            result = cursor.execute(reset_lcl_interval_sql)
+            if result != 0:
+                self.stdio.error("Fail to reset lcl operation interval.")
+                return False
+        except MySQL.DatabaseError as e:
+            self.stdio.error("enable lcl exception {}".format(e.args))
+            return False
+        return True
