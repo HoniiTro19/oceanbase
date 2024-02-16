@@ -135,6 +135,7 @@ public:
   int get_endpoint_value(common::ObObj &value) const;
   int inc_endpoint_repeat_count(const common::ObObj &value);
   int get_percentage_value(double_t percentage, common::ObObj &value);
+  int get_endpoint_values(ObArray<int64_t> &counts, ObArray<double_t> &values);
 
   int prepare_allocate_buckets(ObIAllocator &allocator, const int64_t bucket_size);
   int add_bucket(const ObHistBucket &bucket);

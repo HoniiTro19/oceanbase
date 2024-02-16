@@ -25,21 +25,6 @@
 namespace oceanbase {
 namespace testbench {
 
-enum ObLatencyTaskType {
-  INVALID_LATENCY_TASK = 0,
-  RPC_LATENCY_TASK,
-  DISTRIBUTED_TXN_LATENCY_TASK,
-  CONTENTION_TXN_LATENCY_TASK,
-  DEADLOCK_TXN_LATENCY_TASK,
-  CONCURRENT_TXN_LATENCY_TASK,
-  COMMIT_SQL_LATENCY_TASK,
-  LOCK_SQL_LATENCY_TASK,
-  DEADLOCK_SQL_LATENCY_TASK,
-  ELECTION_LATENCY_TASK,
-  ROLLBACK_TXN_LATENCY_TASK,
-  LATENCY_TASK_TYPE_CNT
-};
-
 const int64_t TASK_QUEUE_SIZE = ObLatencyTaskType::LATENCY_TASK_TYPE_CNT;
 
 class ObLatencyTask {
@@ -140,6 +125,8 @@ public:
   int get_percentage_latency(ObLatencyTaskType type, double_t percentage, double_t &latency);
   const ObHistogram &get_histogram(ObLatencyTaskType type) const;
   const ObStatisticsQueueTask &get_queue_task(ObLatencyTaskType type) const;
+  // NOTE: latency task pushed after this api will be ignored
+  int generate_report();
 
   inline int get_tg_id() const { return tg_id_; }
   inline bool is_snapshot_ready() const { return 0 == snapshot_ready_; }
@@ -164,6 +151,7 @@ private:
   ObStatisticsSubmitTask submit_;
   ObStatisticsQueueTask submit_queues_[TASK_QUEUE_SIZE];
   ObHistogram histograms_[TASK_QUEUE_SIZE];
+  char result_file_[OB_MAX_CONTEXT_STRING_LENGTH];
   ObArenaAllocator allocator_;
 
 private:

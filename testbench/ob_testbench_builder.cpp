@@ -24,7 +24,6 @@ ObTestbenchOptions::ObTestbenchOptions()
     duration_(1), 
     workloads_opts_() 
 {
-  home_path_[0] = '\0';
   snprintf(log_dir_, OB_MAX_CONTEXT_STRING_LENGTH, "%s", "log");
   snprintf(log_file_, OB_MAX_CONTEXT_STRING_LENGTH, "%s", "log/scheduler.log");
 }
@@ -187,8 +186,12 @@ int ObTestbenchBuilder::start_service() {
 }
 
 void ObTestbenchBuilder::stop_service() {
+  int ret = OB_SUCCESS;
   transaction_scheduler_.destroy();
   executor_pool_.destroy();
+  if (OB_FAIL(statistics_collector_.generate_report())) {
+    TESTBENCH_LOG(ERROR, "statistics collector generate report failed", KR(ret));
+  }
   statistics_collector_.destroy();
   sql_proxy_.destroy();
   opts_->destroy_options();

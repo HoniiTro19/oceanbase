@@ -77,7 +77,6 @@ class SchedulerManager(Manager):
     def _parse_cmd(self):
         opts_dict = OrderedDict(
             {
-                "home_path": "-H",
                 "log_level": "-l",
                 "time": "-t"
             }

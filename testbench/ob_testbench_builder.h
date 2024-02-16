@@ -34,7 +34,6 @@ namespace testbench
     int workload_opts_cnt_;
     int8_t log_level_;
     int log_file_size_;
-    char home_path_[OB_MAX_CONTEXT_STRING_LENGTH];
     char log_dir_[OB_MAX_CONTEXT_STRING_LENGTH];
     char log_file_[OB_MAX_CONTEXT_STRING_LENGTH];
     int duration_;
@@ -43,7 +42,7 @@ namespace testbench
     ObStatisticsCollectorOptions *statistics_opts_;
     ObConnectionOptions *connection_opts_;
 
-    TO_STRING_KV(K_(workload_opts_cnt), K_(log_level), K_(log_level), KCSTRING_(home_path), KCSTRING_(log_dir), KCSTRING_(log_file), K_(duration));
+    TO_STRING_KV(K_(workload_opts_cnt), K_(log_level), K_(log_level), KCSTRING_(log_dir), KCSTRING_(log_file), K_(duration));
   };
 
   class ObTestbenchBuilder

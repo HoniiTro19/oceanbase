@@ -176,7 +176,9 @@ ObTestbenchStatisticsCollector::ObTestbenchStatisticsCollector()
     submit_queues_{},
     histograms_{},
     allocator_("StatCollect")
-  {}
+{
+  snprintf(result_file_, OB_MAX_CONTEXT_STRING_LENGTH, "%s", "log/scheduler.result");
+}
 
 ObTestbenchStatisticsCollector::~ObTestbenchStatisticsCollector() {}
 
@@ -296,8 +298,12 @@ int ObTestbenchStatisticsCollector::push_latency_task(ObLatencyTask *task) {
   } else if (OB_FAIL(submit_queues_[type].push(task))) {
     TESTBENCH_LOG(ERROR, "push latency task failed", K(submit_queues_[type]), K(type), K(ret));
   } else {
+    int64_t queue_size = submit_queues_[type].get_snapshot_queue_cnt();
     submit_queues_[type].inc_total_submit_cnt();
     submit_queues_[type].revoke_lease();
+    if (queue_size > 1000 && OB_FAIL(sync_latency_task())) {
+      TESTBENCH_LOG(ERROR, "push sync latency task failed", KR(ret));
+    }
   }
   return ret;
 }
@@ -422,6 +428,64 @@ int ObTestbenchStatisticsCollector::handle_submit_task_() {
     snapshot_ready_ = submit_count;
     TESTBENCH_LOG(TRACE, "submit queued tasks succeed");
   }
+  return ret;
+}
+
+int ObTestbenchStatisticsCollector::generate_report() {
+  int ret = OB_SUCCESS;
+  unsigned int mode = 0644;
+  int32_t fd = -1;
+  if (OB_FAIL(sync_latency_task())) {
+    TESTBENCH_LOG(ERROR, "push sync latency task failed", KR(ret));
+  } else if (OB_UNLIKELY((fd = ::open(result_file_, O_WRONLY | O_CREAT | O_APPEND, mode))) < 0) {
+    ret = OB_ERR_UNEXPECTED;
+    (void)close(fd);
+    TESTBENCH_LOG(ERROR, "open result file failed", KR(ret), K(fd));
+  } else {
+    ob_usleep(5000);
+    while (!is_snapshot_ready()) {}
+    static const int64_t max_buf_len = 512;
+    char buf[max_buf_len];
+    for (int64_t i = 0; i < TASK_QUEUE_SIZE; ++i) {
+      if (submit_queues_[i].is_histogram_inited()) {
+        snprintf(buf, max_buf_len, "histogram type: %s\n", latency_task_names[i]);
+        ObArray<int64_t> counts;
+        ObArray<double_t> values;
+        if (OB_UNLIKELY(-1 == ::write(fd, buf, strlen(buf)))) {
+          ret = OB_ERR_SYS;
+          TESTBENCH_LOG(ERROR, "write histogram type name failed", KR(ret), "name", latency_task_names[i]);
+        } else if (OB_FAIL(histograms_[i].get_endpoint_values(counts, values))) {
+          TESTBENCH_LOG(ERROR, "get histogram endpoint values failed", KR(ret), "name", latency_task_names[i]);
+        } else {
+          const char *counts_title = "endpoint counts: \n";
+          if (OB_UNLIKELY(-1 == ::write(fd, counts_title, strlen(counts_title)))) {
+            ret = OB_ERR_SYS;
+            TESTBENCH_LOG(ERROR, "write endpoint counts title failed", KR(ret), KCSTRING(counts_title));
+          }
+          ARRAY_FOREACH(counts, i) {
+            snprintf(buf, max_buf_len, "%ld\n", counts.at(i));
+            if (OB_UNLIKELY(-1 == ::write(fd, buf, strlen(buf)))) {
+              ret = OB_ERR_SYS;
+              TESTBENCH_LOG(ERROR, "write endpoint count line failed", KR(ret), "index", i);
+            }
+          }
+          const char *values_title = "endpoint values: \n";
+          if (OB_UNLIKELY(-1 == ::write(fd, values_title, strlen(values_title)))) {
+            ret = OB_ERR_SYS;
+            TESTBENCH_LOG(ERROR, "write endpoint values title failed", KR(ret), KCSTRING(values_title));
+          }
+          ARRAY_FOREACH(values, i) {
+            snprintf(buf, max_buf_len, "%.3f\n", values.at(i));
+            if (OB_UNLIKELY(-1 == ::write(fd, buf, strlen(buf)))) {
+              ret = OB_ERR_SYS;
+              TESTBENCH_LOG(ERROR, "write endpoint value line failed", KR(ret), "index", i);
+            }
+          }
+        }
+      }
+    }
+  }
+  (void)close(fd);
   return ret;
 }
 
