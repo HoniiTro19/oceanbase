@@ -262,10 +262,10 @@ class TestBench(object):
 
         self.scheduler_manager.repo = repo
         ret = LocalClient.execute_command(self.scheduler_manager.cmd, stdio=self.stdio)
-        self.stdio.verbose("return code: {}".format(ret.code))
-        self.stdio.verbose("stdout: {}".format(ret.stdout))
-        self.stdio.verbose("stderr: {}".format(ret.stderr))
         if ret.stderr or ret.code:
+            self.stdio.error(
+                "Fail to start benchmark scheduler, code: {}, stdout: {}, stderr: {}".format(ret.code, ret.stdout, ret.stderr)
+            )
             return False
         return True
 
@@ -597,5 +597,61 @@ class TestBench(object):
                 return False
         except MySQL.DatabaseError as e:
             self.stdio.error("enable lcl exception {}".format(e.args))
+            return False
+        return True
+    
+    def enable_mocknet(self):
+        config = getattr(self._opts, "config", "")
+        if not self.cluster_manager.create_yaml(config):
+            self.stdio.error(
+                "Fail to load cluster config for testbench {}".format(config)
+            )
+            return False
+        rpc_port_list = self.cluster_manager.get_rpc_port_list()
+        delay = getattr(self._opts, "delay", "0")
+        loss = getattr(self._opts, "loss", "0")
+        add_qdisc_cmd = "sudo tc qdisc add dev lo root handle 1: prio bands 4"
+        self.stdio.verbose("start command {}".format(add_qdisc_cmd))
+        ret = LocalClient.execute_command(add_qdisc_cmd, stdio=self.stdio)
+        if ret.stderr or ret.code:
+            self.stdio.error(
+                "Fail to add qdisc to tc root, code: {}, stdout: {}, stderr: {}".format(ret.code, ret.stdout, ret.stderr)
+            )
+            return False
+        add_net_env_cmd = "sudo tc qdisc add dev lo parent 1:4 handle 40: netem delay {}ms loss {}%".format(delay, loss)
+        self.stdio.verbose("start command {}".format(add_net_env_cmd))
+        ret = LocalClient.execute_command(add_net_env_cmd, stdio=self.stdio)
+        if ret.stderr or ret.code:
+            self.stdio.error(
+                "Fail to set network delay and packet loss, code: {}, stdout: {}, stderr: {}".format(ret.code, ret.stdout, ret.stderr)
+            )
+            return False
+        for port in rpc_port_list:
+            add_filter = "sudo tc filter add dev lo protocol ip parent 1:0 prio 4 u32 match ip dport {} 0xffff flowid 1:4".format(port)
+            self.stdio.verbose("start command {}".format(add_filter))
+            ret = LocalClient.execute_command(add_filter, stdio=self.stdio)
+            if ret.stderr or ret.code:
+                self.stdio.error(
+                    "Fail to add filter for server port, code: {}, stdout: {}, stderr: {}".format(ret.code, ret.stdout, ret.stderr)
+                )
+                return False        
+        return True
+    
+    def disable_mocknet(self):
+        remove_filter_cmd = "sudo tc filter del dev lo pref 4"
+        self.stdio.verbose("start command {}".format(remove_filter_cmd))
+        ret = LocalClient.execute_command(remove_filter_cmd, stdio=self.stdio)
+        if ret.stderr or ret.code:
+            self.stdio.error(
+                "Fail to remove filters, code: {}, stdout: {}, stderr: {}".format(ret.code, ret.stdout, ret.stderr)
+            )
+            return False
+        remove_qdisc_cmd = "sudo tc qdisc del dev lo root handle 1: prio bands 4"
+        self.stdio.verbose("start command {}".format(remove_qdisc_cmd))
+        ret = LocalClient.execute_command(remove_qdisc_cmd, stdio=self.stdio)
+        if ret.stderr or ret.code:
+            self.stdio.error(
+                "Fail to remove the qdisc, code: {}, stdout: {}, stderr: {}".format(ret.code, ret.stdout, ret.stderr)
+            )
             return False
         return True

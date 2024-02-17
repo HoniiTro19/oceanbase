@@ -373,6 +373,7 @@ class BenchMajorCommand(MajorCommand):
         self.register_command(BenchDataCommand())
         self.register_command(BenchLoadCommand())
         self.register_command(BenchTestCommand())
+        self.register_command(BenchMocknetCommand())
 
 
 class BenchDataCommand(TestBenchCommand):
@@ -468,7 +469,40 @@ class BenchTestCommand(TestBenchCommand):
         if need_lcl:
             self._do_step("Disabling lcl for deadlock transactions.", tb.reset_lcl)
 
-
+class BenchMocknetCommand(TestBenchCommand):
+    def __init__(self):
+        super(BenchMocknetCommand, self).__init__(
+            "mocknet", "Simulate the network environment among database instances."
+        )
+        self.parser.add_option(
+            "-c", "--config", type="string", help="Path to the cluster configuration file."
+        )
+        self.parser.add_option(
+            "-d", "--delay", type="int", help="Millisecond-level network latency."
+        )
+        self.parser.add_option(
+            "-l", "--loss", type="int", help="Precentagewise network packet loss rate."
+        )
+    
+    def _check(self):
+        config = getattr(self.opts, "config", "")
+        if not config:
+            ROOT_IO.error("Fail to set mocknet without cluster configuration file.")
+            return False
+        if not os.path.exists(config):
+            ROOT_IO.error("Configuration file {} does not exists.".format(config))
+            return False
+        
+        loss = int(getattr(self.opts, "loss", "0"))
+        if loss > 100 or loss < 0:
+            ROOT_IO.error("Network packet loss rate get {}, which should be in the range [0, 100]".format(loss))
+            return False
+        return True
+    
+    def _do_command(self, tb):
+        self._do_step("Simulating network environment.", tb.enable_mocknet)
+        self._do_step("Reseting network environment.", tb.disable_mocknet)
+        
 class ReportMajorCommand(MajorCommand):
     def __init__(self):
         super(ReportMajorCommand, self).__init__(
