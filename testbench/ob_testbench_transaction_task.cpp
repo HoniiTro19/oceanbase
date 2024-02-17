@@ -196,7 +196,7 @@ int ObIWorkloadTransactionTask::record_latency(ObLatencyTaskType type, int64_t l
   ObLatencyTask *task = nullptr;
   void *buf = nullptr;
   common::ObObj latency_obj;
-  latency_obj.set_double(latency);
+  latency_obj.set_int(latency);
   if (OB_ISNULL(buf = allocator_.alloc(sizeof(ObLatencyTask)))) {
     ret = OB_ALLOCATE_MEMORY_FAILED;
     TESTBENCH_LOG(ERROR, "allocate memory failed", KR(ret));

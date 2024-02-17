@@ -56,14 +56,11 @@ class ObStatisticsTask {
 public:
   ObStatisticsTask();
   virtual ~ObStatisticsTask();
-  bool acquire_lease();
-  bool revoke_lease();
   inline ObStatisticsTaskType get_type() const { return type_; }
   VIRTUAL_TO_STRING_KV(K(type_));
 
 protected:
   ObStatisticsTaskType type_;
-  common::ObThreadLease lease_;
 };
 
 class ObStatisticsSubmitTask : public ObStatisticsTask {
@@ -83,15 +80,16 @@ public:
   int64_t get_total_submit_cnt() const;
   int64_t get_total_apply_cnt() const;
   int64_t get_snapshot_queue_cnt() const;
-  double_t get_min_value() const;
-  double_t get_max_value() const;
-  inline int64_t get_index() const { return index_; }
-  inline bool is_histogram_inited() const { return histogram_inited_; }
+  int64_t get_min_value() const;
+  int64_t get_max_value() const;
+  bool is_histogram_inited() const;
   void set_histogram_inited();
 
   int top(ObLatencyTask *&task);
   int pop();
   int push(ObLatencyTask *task);
+
+  inline int64_t get_index() const { return index_; }
   INHERIT_TO_STRING_KV("ObStatisticsTask", ObStatisticsTask, 
     K(total_submit_cnt_), K(total_apply_cnt_), K(index_));
 
@@ -100,12 +98,9 @@ private:
   int64_t total_apply_cnt_;
   common::ObSpLinkQueue queue_;
   int64_t index_;
-  // the minimum and maximum value in the queue are not dynamically maintained 
-  // they are only used in ObHistogram initialization
-  common::ObObj min_value_;
-  common::ObObj max_value_;
+  int64_t min_value_;
+  int64_t max_value_;
   bool histogram_inited_;
-  ObArenaAllocator inner_allocator_;
 };
 
 class ObTestbenchStatisticsCollector : public lib::TGTaskHandler {
@@ -127,9 +122,7 @@ public:
   const ObStatisticsQueueTask &get_queue_task(ObLatencyTaskType type) const;
   // NOTE: latency task pushed after this api will be ignored
   int generate_report();
-
   inline int get_tg_id() const { return tg_id_; }
-  inline bool is_snapshot_ready() const { return 0 == snapshot_ready_; }
 
 private:
   int handle_queue_task_(ObStatisticsQueueTask *task);
@@ -144,7 +137,6 @@ private:
   bool is_inited_;
   int64_t thread_num_;
   int64_t task_queue_limit_;
-  int64_t snapshot_ready_;
   int64_t bucket_capacity_;
   double_t bucket_min_ratio_;
   double_t bucket_max_ratio_;

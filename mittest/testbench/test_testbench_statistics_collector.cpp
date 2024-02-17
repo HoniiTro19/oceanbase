@@ -39,12 +39,12 @@ void TestStatisticsCollector::Tear() {
 
 TEST_F(TestStatisticsCollector, push_submit_task) {
   ObLatencyTaskType type = ObLatencyTaskType::DISTRIBUTED_TXN_LATENCY_TASK;
-  std::vector<double_t> latencys;
+  std::vector<int64_t> latencys;
   int latency_count = 1000;
   for (int i = 0; i < latency_count; ++i) {
     common::ObObj latency;
-    double_t rnd_latency = random.rand(0, 100);
-    latency.set_double(rnd_latency);
+    int64_t rnd_latency = random.rand(0, 100);
+    latency.set_int(rnd_latency);
     latencys.push_back(rnd_latency);
     void *buf = allocator.alloc(sizeof(ObLatencyTask));
     ObLatencyTask *latency_task = new (buf)ObLatencyTask(type, latency);
@@ -52,7 +52,11 @@ TEST_F(TestStatisticsCollector, push_submit_task) {
   }
   ASSERT_EQ(OB_SUCCESS, statistics_collector.sync_latency_task());
   ob_usleep(5000);
-  while (!statistics_collector.is_snapshot_ready()) {}
+  int64_t num = 0;
+  int tg_id = statistics_collector.get_tg_id();
+  while (TG_GET_QUEUE_NUM(tg_id, num) && num > 0) {
+    PAUSE();
+  }
   std::sort(latencys.begin(), latencys.end());
   const ObHistogram &histogram = statistics_collector.get_histogram(type);
   double_t bucket_width = histogram.get_bucket_width();
@@ -73,8 +77,8 @@ TEST_F(TestStatisticsCollector, concurrent_push) {
   auto process_task = [&]() {
     for (int64_t i = 0; i < latency_count; ++i) {
       common::ObObj latency;
-      double_t rnd_latency = random.rand(0, 100);
-      latency.set_double(rnd_latency);
+      int64_t rnd_latency = random.rand(0, 100);
+      latency.set_int(rnd_latency);
       void *buf = allocator.alloc(sizeof(ObLatencyTask));
       ObLatencyTask *latency_task = new (buf)ObLatencyTask(type, latency);
       ASSERT_EQ(OB_SUCCESS, statistics_collector.push_latency_task(latency_task));
