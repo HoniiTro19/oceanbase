@@ -80,8 +80,6 @@ public:
   int64_t get_total_submit_cnt() const;
   int64_t get_total_apply_cnt() const;
   int64_t get_snapshot_queue_cnt() const;
-  int64_t get_min_value() const;
-  int64_t get_max_value() const;
   bool is_histogram_inited() const;
   void set_histogram_inited();
 
@@ -98,8 +96,6 @@ private:
   int64_t total_apply_cnt_;
   common::ObSpLinkQueue queue_;
   int64_t index_;
-  int64_t min_value_;
-  int64_t max_value_;
   bool histogram_inited_;
 };
 
@@ -120,6 +116,7 @@ public:
   int get_percentage_latency(ObLatencyTaskType type, double_t percentage, double_t &latency);
   const ObHistogram &get_histogram(ObLatencyTaskType type) const;
   const ObStatisticsQueueTask &get_queue_task(ObLatencyTaskType type) const;
+  int init_histogram_(ObStatisticsQueueTask *task);
   // NOTE: latency task pushed after this api will be ignored
   int generate_report();
   inline int get_tg_id() const { return tg_id_; }

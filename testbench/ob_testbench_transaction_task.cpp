@@ -200,9 +200,10 @@ int ObIWorkloadTransactionTask::record_latency(ObLatencyTaskType type, int64_t l
   if (OB_ISNULL(buf = allocator_.alloc(sizeof(ObLatencyTask)))) {
     ret = OB_ALLOCATE_MEMORY_FAILED;
     TESTBENCH_LOG(ERROR, "allocate memory failed", KR(ret));
-  } else {
-    task = new(buf)ObLatencyTask(type, latency_obj);
-    latency_collector_->push_latency_task(task);
+  } else if (OB_ISNULL(task = new(buf)ObLatencyTask(type, latency_obj))) {
+    TESTBENCH_LOG(ERROR, "create new latency task failed", KR(ret), K(type));
+  } else if (OB_FAIL(latency_collector_->push_latency_task(task))) {
+    TESTBENCH_LOG(ERROR, "push latency task failed", KR(ret), K(latency_obj));
   }
   return ret;
 }
