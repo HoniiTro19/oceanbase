@@ -374,7 +374,7 @@ class BenchMajorCommand(MajorCommand):
         self.register_command(BenchLoadCommand())
         self.register_command(BenchTestCommand())
         self.register_command(BenchMocknetCommand())
-
+        self.register_command(BenchResetnetCommand())
 
 class BenchDataCommand(TestBenchCommand):
     def __init__(self):
@@ -510,8 +510,16 @@ class BenchMocknetCommand(TestBenchCommand):
     def _do_command(self, tb):
         self._do_step("Checking options.", self._check)
         self._do_step("Simulating network environment.", tb.enable_mocknet)
+
+class BenchResetnetCommand(TestBenchCommand):
+    def __init__(self):
+        super(BenchResetnetCommand, self).__init__(
+            "resetnet", "Reset the network environment among database instance."
+        )
+    
+    def _do_command(self, tb):
         self._do_step("Reseting network environment.", tb.disable_mocknet)
-        
+
 class ReportMajorCommand(MajorCommand):
     def __init__(self):
         super(ReportMajorCommand, self).__init__(
