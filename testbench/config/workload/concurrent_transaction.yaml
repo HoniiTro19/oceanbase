@@ -1,0 +1,31 @@
+# empty password should not exist in the config file
+instance_testbench:
+  global:
+    # common parameters
+    log_level: INFO
+    time: 1
+  statistics:
+    # for statistics collector
+    capacity: 500
+    minimum: 10
+    maximum: 50
+    threads: 1
+    tasks: 99999
+  connection:
+    # for connection parameters
+    host: 127.0.0.1
+    port: 28801
+    user: root
+    # password:  
+    database: test
+    table: testbench
+  dataset:
+    # for dataset parameteres
+    partitions: 9
+    rows: 1000000
+  concurrent:
+    threads: 5
+    tasks: 99999
+    concurrency: 5
+    operations: 10
+    readonly: 50

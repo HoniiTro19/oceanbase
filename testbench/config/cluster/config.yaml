@@ -4,9 +4,9 @@ instance_observer:
     cluster_id: 1
     # please set memory limit to a suitable value which is matching resource. 
     memory_limit: 32G # The maximum running memory for an observer
-    system_memory: 14G # The reserved system memory. system_memory is reserved for general tenants. The default value is 30G.
-    datafile_size: 80G # Size of the data file. 
-    log_disk_size: 80G # The size of disk space used by the clog files.
+    system_memory: 15G # The reserved system memory. system_memory is reserved for general tenants. The default value is 30G.
+    datafile_size: 32G # Size of the data file. 
+    log_disk_size: 32G # The size of disk space used by the clog files.
     cpu_count: 8
     production_mode: false
     syslog_level: INFO # System log level. The default value is INFO.
@@ -15,7 +15,7 @@ instance_observer:
     max_syslog_file_count: 4 # The maximum number of reserved log files before enabling auto recycling. The default value is 0.
     # root_password: # root user password, can be empty
     __min_full_resource_pool_memory: 1073741824
-    home_path: /data/homedata/zhd/cluster
+    home_path: /home/zhd/cluster
   server1:
     mysql_port: 28801 # External port for OceanBase Database. The default value is 2881. DO NOT change this value after the cluster is started.
     rpc_port: 28802 # Internal port for OceanBase Database. The default value is 2882. DO NOT change this value after the cluster is started.
