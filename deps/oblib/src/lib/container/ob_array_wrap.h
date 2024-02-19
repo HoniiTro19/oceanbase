@@ -117,6 +117,18 @@ public:
     }
   }
 
+  void release_array(ObIAllocator &allocator)
+  {
+    if (data_ != NULL) {
+      for (int64_t i = 0; i < count_; ++i) {
+        data_[i].~T();
+      }
+      allocator.free(data_);
+      count_ = 0;
+      data_ = NULL;
+    }
+  }
+
   int64_t to_string(char *buf, const int64_t buf_len) const
   {
     int ret = OB_SUCCESS;

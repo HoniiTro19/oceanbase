@@ -175,6 +175,7 @@ int ObHistogram::get_endpoint_values(ObArray<int64_t> &counts, ObArray<double_t>
       LOG_WARN("push back endpoint value failed", K(ret));
     }
   }
+  LOG_INFO("get endpoint values", KR(ret), K_(sample_size));
   return ret;
 }
 

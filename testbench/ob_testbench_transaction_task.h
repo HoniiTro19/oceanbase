@@ -129,6 +129,8 @@ namespace oceanbase
       int push_forward_operations(int64_t conn_idx, int64_t &current_row_id);
 
     private:
+      int64_t begin_trace_cnt_;
+      int64_t end_trace_cnt_;
       int64_t aborts_;
       int64_t operations_;
       const char *lock_contention_sql_format_;

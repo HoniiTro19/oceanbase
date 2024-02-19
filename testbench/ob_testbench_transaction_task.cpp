@@ -32,11 +32,11 @@ ObIWorkloadTransactionTask::ObIWorkloadTransactionTask(BasicTaskConfig config)
 
 ObIWorkloadTransactionTask::~ObIWorkloadTransactionTask() 
 {
-  latencys_.release_array();
-  cumulative_latencys_.release_array();
-  commits_.release_array();
-  connections_.release_array();
-  pollfds_.release_array();
+  latencys_.release_array(allocator_);
+  cumulative_latencys_.release_array(allocator_);
+  commits_.release_array(allocator_);
+  connections_.release_array(allocator_);
+  pollfds_.release_array(allocator_);
 }
 
 void ObIWorkloadTransactionTask::begin_trace_latency(int64_t &latency) 
@@ -194,13 +194,16 @@ int ObIWorkloadTransactionTask::record_latency(ObLatencyTaskType type, int64_t l
 {
   int ret = OB_SUCCESS;
   ObLatencyTask *task = nullptr;
-  void *buf = nullptr;
   common::ObObj latency_obj;
   latency_obj.set_int(latency);
-  if (OB_ISNULL(buf = allocator_.alloc(sizeof(ObLatencyTask)))) {
-    ret = OB_ALLOCATE_MEMORY_FAILED;
-    TESTBENCH_LOG(ERROR, "allocate memory failed", KR(ret));
-  } else if (OB_ISNULL(task = new(buf)ObLatencyTask(type, latency_obj))) {
+  // TODO: use the right allocator
+  // void *buf = nullptr;
+  // if (OB_ISNULL(buf = allocator_.alloc(sizeof(ObLatencyTask)))) {
+  //   ret = OB_ALLOCATE_MEMORY_FAILED;
+  //   TESTBENCH_LOG(ERROR, "allocate memory failed", KR(ret));
+  // } else if (OB_ISNULL(task = new(buf)ObLatencyTask(type, latency_obj))) {
+  //   TESTBENCH_LOG(ERROR, "create new latency task failed", KR(ret), K(type));
+  if (OB_ISNULL(task = new ObLatencyTask(type, latency_obj))) {
     TESTBENCH_LOG(ERROR, "create new latency task failed", KR(ret), K(type));
   } else if (OB_FAIL(latency_collector_->push_latency_task(task))) {
     TESTBENCH_LOG(ERROR, "push latency task failed", KR(ret), K(latency_obj));
@@ -254,7 +257,7 @@ ObDistributedTransactionTask::ObDistributedTransactionTask(BasicTaskConfig basic
 
 ObDistributedTransactionTask::~ObDistributedTransactionTask() 
 {
-  lock_dist_stmts_.release_array();
+  lock_dist_stmts_.release_array(allocator_);
 }
 
 int ObDistributedTransactionTask::release_dblinks() 
@@ -267,6 +270,7 @@ int ObDistributedTransactionTask::release_dblinks()
       TESTBENCH_LOG(ERROR, "release dblink failed", KR(ret));
     }
   }
+  lock_dist_stmts_.release_array(allocator_);
   return ret;
 }
 
@@ -369,15 +373,15 @@ WorkloadType ObDistributedTransactionTask::get_type()
                                         ObContentionTransactionTask
 */
 ObContentionTransactionTask::ObContentionTransactionTask(BasicTaskConfig basic_config, int64_t aborts, int64_t operations) 
-: ObIWorkloadTransactionTask(basic_config), aborts_(aborts), operations_(operations), lock_contention_sql_(), finished_(0), act_commits_(0)
+: ObIWorkloadTransactionTask(basic_config), begin_trace_cnt_(0), end_trace_cnt_(0), aborts_(aborts), operations_(operations), lock_contention_sql_(), finished_(0), act_commits_(0)
 {
   lock_contention_sql_format_ = "UPDATE %s SET lock_elr = lock_elr + 1 WHERE partition_id = ? AND row_id = ?;";
 }
 
 ObContentionTransactionTask::~ObContentionTransactionTask() 
 {
-  lock_contention_stmts_.release_array();
-  act_operations_.release_array();
+  lock_contention_stmts_.release_array(allocator_);
+  act_operations_.release_array(allocator_);
 }
 
 int ObContentionTransactionTask::init() 
@@ -442,6 +446,9 @@ int ObContentionTransactionTask::execute_transactions()
     }
     TESTBENCH_LOG(DEBUG, "check connections operations status", K_(act_operations));
   }
+  if (begin_trace_cnt_ != connection_count_ || end_trace_cnt_ != connection_count_) {
+    TESTBENCH_LOG(ERROR, "check trace", K_(begin_trace_cnt), K_(end_trace_cnt));
+  }
   return ret;
 }
 
@@ -493,10 +500,10 @@ int ObContentionTransactionTask::push_forward_operations(int64_t conn_idx, int64
       int64_t contention_row_id = row_id_start_;
       ObMySQLPreparedStatement &stmt = lock_contention_stmts_.at(conn_idx);
       ObMySQLConnection *conn = connections_.at(conn_idx);
+      begin_trace_latency(latencys_.at(conn_idx));
+      ++begin_trace_cnt_;
       if (OB_FAIL(bind_params(parameters_.at(contention_partition_id), contention_row_id, stmt))) {
         TESTBENCH_LOG(WARN, "bind parameters for statement failed", KR(ret), "partition", parameters_.at(contention_partition_id), "row", contention_row_id);
-      } else if (FALSE_IT(begin_trace_latency(latencys_.at(conn_idx)))) {
-        // impossible
       } else if (OB_FAIL(connections_.at(conn_idx)->execute_write_async(stmt))) {
         TESTBENCH_LOG(WARN, "execute write async failed", KR(ret));
       }
@@ -507,6 +514,7 @@ int ObContentionTransactionTask::push_forward_operations(int64_t conn_idx, int64
     } else if (act_operations_.at(conn_idx) < operations_) {
       if (act_operations_.at(conn_idx) == 1) {
         end_trace_latency(latencys_.at(conn_idx));
+        ++end_trace_cnt_;
       }
       ObMySQLPreparedStatement &stmt = lock_contention_stmts_.at(conn_idx);
       ObMySQLConnection *conn = connections_.at(conn_idx);
@@ -561,8 +569,8 @@ ObDeadlockTransactionTask::ObDeadlockTransactionTask(BasicTaskConfig basic_confi
 
 ObDeadlockTransactionTask::~ObDeadlockTransactionTask() 
 {
-  lock_deadlock_stmts_.release_array();
-  lock_multi_deadlock_stmts_.release_array();
+  lock_deadlock_stmts_.release_array(allocator_);
+  lock_multi_deadlock_stmts_.release_array(allocator_);
 }
 
 int ObDeadlockTransactionTask::init() {
@@ -780,10 +788,10 @@ ObConcurrentTransactionTask::ObConcurrentTransactionTask(BasicTaskConfig basic_c
 
 ObConcurrentTransactionTask::~ObConcurrentTransactionTask() 
 {
-  lock_wrtxn_stmts_.release_array();
-  lock_rdtxn_stmts_.release_array();
-  wait_for_reads_.release_array();
-  act_operations_.release_array();
+  lock_wrtxn_stmts_.release_array(allocator_);
+  lock_rdtxn_stmts_.release_array(allocator_);
+  wait_for_reads_.release_array(allocator_);
+  act_operations_.release_array(allocator_);
 }
 
 int ObConcurrentTransactionTask::init() {

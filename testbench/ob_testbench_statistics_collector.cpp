@@ -344,7 +344,7 @@ int ObTestbenchStatisticsCollector::handle_queue_task_(ObStatisticsQueueTask *ta
     ObVector<common::ObObj> buffer;
     buffer.reset();
     for (int64_t i = 0; i < task_cnt; ++i) {
-        ObLatencyTask *latency_task = nullptr;
+      ObLatencyTask *latency_task = nullptr;
       if (OB_FAIL(task->top(latency_task))) {
         TESTBENCH_LOG(WARN, "get top latency task failed", KR(ret));
       } else {
@@ -356,7 +356,8 @@ int ObTestbenchStatisticsCollector::handle_queue_task_(ObStatisticsQueueTask *ta
         if (OB_FAIL(task->pop())) {
           TESTBENCH_LOG(WARN, "pop top latency task failed", KR(ret));
         }
-        allocator_.free(latency_task);
+        // allocator_.free(latency_task);
+        delete latency_task;
       }
     }
     std::sort(buffer.begin(), buffer.end());
@@ -395,7 +396,8 @@ int ObTestbenchStatisticsCollector::handle_queue_task_(ObStatisticsQueueTask *ta
         if (OB_FAIL(task->pop())) {
           TESTBENCH_LOG(WARN, "pop top latency task failed", K(ret));
         }
-        allocator_.free(latency_task);
+        // allocator_.free(latency_task);
+        delete latency_task;
       }
     }
   }
