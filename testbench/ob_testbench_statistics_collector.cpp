@@ -35,17 +35,9 @@ common::ObLink *ObLatencyTask::__get_member_address(ObLatencyTask *ptr) {
 /*
                               ObStatisticsTask
 */
-ObStatisticsTask::ObStatisticsTask() : lease_() {}
+ObStatisticsTask::ObStatisticsTask() {}
 
 ObStatisticsTask::~ObStatisticsTask() {}
-
-bool ObStatisticsTask::acquire_lease() {
-  return lease_.acquire();
-}
-
-bool ObStatisticsTask::revoke_lease() {
-  return lease_.revoke();
-}
 
 /*
                               ObStatisticsSubmitTask
@@ -68,14 +60,8 @@ ObStatisticsQueueTask::ObStatisticsQueueTask()
   : total_submit_cnt_(0),
     total_apply_cnt_(0),
     index_(-1),
-    min_value_(),
-    max_value_(),
-    histogram_inited_(false),
-    inner_allocator_("StatCollect")
-  {
-    min_value_.set_null();
-    max_value_.set_null();
-  }
+    histogram_inited_(false)
+{}
 
 ObStatisticsQueueTask::~ObStatisticsQueueTask() {}
 
@@ -120,47 +106,36 @@ int ObStatisticsQueueTask::push(ObLatencyTask *task) {
     TESTBENCH_LOG(WARN, "get null latency value", K(ret), KPC(task));
   } else if (OB_FAIL(queue_.push(link))) {
     TESTBENCH_LOG(WARN, "push oblink to the queue failed", K(ret));
-  } else {
-    if (min_value_.is_null() || latency.get_double() < min_value_.get_double()) {
-      min_value_ = latency;
-    }
-    if (max_value_.is_null() || latency.get_double() > max_value_.get_double()) {
-      max_value_ = latency;
-    }
   }
   return ret;
 }
 
 void ObStatisticsQueueTask::inc_total_submit_cnt() {
-  ++total_submit_cnt_;
+  ATOMIC_INC(&total_submit_cnt_);
 }
 
 void ObStatisticsQueueTask::inc_total_apply_cnt() {
-  ++total_apply_cnt_;
+  ATOMIC_INC(&total_apply_cnt_);
 }
 
 int64_t ObStatisticsQueueTask::get_total_submit_cnt() const {
-  return total_submit_cnt_;
+  return ATOMIC_LOAD(&total_submit_cnt_);
 }
 
 int64_t ObStatisticsQueueTask::get_total_apply_cnt() const {
-  return total_apply_cnt_;
+  return ATOMIC_LOAD(&total_apply_cnt_);
 }
 
 int64_t ObStatisticsQueueTask::get_snapshot_queue_cnt() const {
-  return total_submit_cnt_ - total_apply_cnt_;
+  return ATOMIC_LOAD(&total_submit_cnt_) - ATOMIC_LOAD(&total_apply_cnt_);
 }
 
-double_t ObStatisticsQueueTask::get_min_value() const {
-  return min_value_.get_double();
-}
-
-double_t ObStatisticsQueueTask::get_max_value() const {
-  return max_value_.get_double();
+bool ObStatisticsQueueTask::is_histogram_inited() const {
+  return ATOMIC_LOAD(&histogram_inited_);
 }
 
 void ObStatisticsQueueTask::set_histogram_inited() {
-  histogram_inited_ = true;
+  ATOMIC_STORE(&histogram_inited_, true);
 }
 
 /*
@@ -171,12 +146,13 @@ ObTestbenchStatisticsCollector::ObTestbenchStatisticsCollector()
     is_inited_(false),
     thread_num_(1),
     task_queue_limit_(99999),
-    snapshot_ready_(0),
     submit_(),
     submit_queues_{},
     histograms_{},
     allocator_("StatCollect")
-  {}
+{
+  snprintf(result_file_, OB_MAX_CONTEXT_STRING_LENGTH, "%s", "log/scheduler.result");
+}
 
 ObTestbenchStatisticsCollector::~ObTestbenchStatisticsCollector() {}
 
@@ -289,15 +265,14 @@ int ObTestbenchStatisticsCollector::push_latency_task(ObLatencyTask *task) {
   if (IS_NOT_INIT) {
     ret = OB_NOT_INIT;
     TESTBENCH_LOG(ERROR, "statistics collector is not inited", K(ret));
-  } else if (OB_UNLIKELY(!submit_queues_[type].acquire_lease())) {
-    ret = OB_ERR_UNEXPECTED;
-    submit_queues_[type].revoke_lease();
-    TESTBENCH_LOG(ERROR, "acquire thread lease failed", K(ret));
   } else if (OB_FAIL(submit_queues_[type].push(task))) {
     TESTBENCH_LOG(ERROR, "push latency task failed", K(submit_queues_[type]), K(type), K(ret));
   } else {
     submit_queues_[type].inc_total_submit_cnt();
-    submit_queues_[type].revoke_lease();
+    int64_t queue_size = submit_queues_[type].get_snapshot_queue_cnt();
+    if (queue_size > 10000 && OB_FAIL(sync_latency_task())) {
+      TESTBENCH_LOG(ERROR, "push sync latency task failed", KR(ret));
+    }
   }
   return ret;
 }
@@ -364,64 +339,145 @@ int ObTestbenchStatisticsCollector::handle_queue_task_(ObStatisticsQueueTask *ta
   int ret = OB_SUCCESS;
   int64_t index = task->get_index();
   ObHistogram &histogram = histograms_[index];
+  int64_t task_cnt = task->get_snapshot_queue_cnt();
   if (OB_UNLIKELY(!task->is_histogram_inited())) {
-    double_t task_min_value = task->get_min_value();
-    double_t task_max_value = task->get_max_value();
-    double_t bucket_width = (task_max_value - task_min_value) / (bucket_capacity_ * (bucket_max_ratio_ - bucket_min_ratio_));
-    double_t bucket_min_value = std::max(static_cast<double_t>(0), task_min_value - bucket_min_ratio_ * bucket_capacity_ * bucket_width);
+    ObVector<common::ObObj> buffer;
+    buffer.reset();
+    for (int64_t i = 0; i < task_cnt; ++i) {
+        ObLatencyTask *latency_task = nullptr;
+      if (OB_FAIL(task->top(latency_task))) {
+        TESTBENCH_LOG(WARN, "get top latency task failed", KR(ret));
+      } else {
+        const common::ObObj &latency = latency_task->get_latency();
+        if (OB_FAIL(buffer.push_back(latency))) {
+          TESTBENCH_LOG(WARN, "put latency into buffer failed", KR(ret));
+        }
+        task->inc_total_apply_cnt();
+        if (OB_FAIL(task->pop())) {
+          TESTBENCH_LOG(WARN, "pop top latency task failed", KR(ret));
+        }
+        allocator_.free(latency_task);
+      }
+    }
+    std::sort(buffer.begin(), buffer.end());
+    int64_t q99_index = 99 * (task_cnt - 1) / 100;
+    int64_t q0_value = buffer[0].get_int();
+    int64_t q99_value = buffer[q99_index].get_int();
+    double_t bucket_width = static_cast<double_t>(q99_value - q0_value) / (bucket_capacity_ * (bucket_max_ratio_ - bucket_min_ratio_));
+    double bucket_min_value = std::max(static_cast<double_t>(0), q0_value - bucket_min_ratio_ * bucket_capacity_ * bucket_width);
     histogram.set_bucket_width(bucket_width);
     for (int64_t i = 0; i < bucket_capacity_; ++i) {
       common::ObObj value;
       value.set_double(bucket_min_value + bucket_width * i);
       ObHistBucket bucket(value, 0, 0, 0);
       if (OB_FAIL(histogram.add_bucket(bucket))) {
-        TESTBENCH_LOG(WARN, "histogram initialization add bucket failed", K(ret), K(bucket));
+        TESTBENCH_LOG(WARN, "histogram initialization add bucket failed", KR(ret), K(bucket));
       }
     }
     task->set_histogram_inited();
-  }
-
-  int64_t task_to_merge = task->get_snapshot_queue_cnt();
-  for (int64_t i = 0; i < task_to_merge; ++i) {
-    ObLatencyTask *latency_task = nullptr;
-    if (OB_FAIL(task->top(latency_task))) {
-      TESTBENCH_LOG(WARN, "get top latency task failed", K(ret));
-    } else {
-      const common::ObObj &latency = latency_task->get_latency();
-      if (OB_FAIL(histogram.inc_endpoint_repeat_count(latency))) {
-        TESTBENCH_LOG(WARN, "increase latency count failed", K(ret), K(latency));
+    TESTBENCH_LOG(INFO, "init histogram finished", KR(ret), K(q99_value), "name", latency_task_names[index], K(bucket_width));
+    for (int64_t i = 0; i < task_cnt; ++i) {
+      if (OB_FAIL(histogram.inc_endpoint_repeat_count(buffer.at(i)))) {
+        TESTBENCH_LOG(WARN, "increase latency count failed", KR(ret), "type", task->get_type(), "latency", buffer.at(i));
       }
-      task->inc_total_apply_cnt();
-      if (OB_FAIL(task->pop())) {
-        TESTBENCH_LOG(WARN, "pop top latency task failed", K(ret));
+    }
+  } else {
+    for (int64_t i = 0; i < task_cnt; ++i) {
+      ObLatencyTask *latency_task = nullptr;
+      if (OB_FAIL(task->top(latency_task))) {
+        TESTBENCH_LOG(WARN, "get top latency task failed", K(ret));
+      } else {
+        const common::ObObj &latency = latency_task->get_latency();
+        if (OB_FAIL(histogram.inc_endpoint_repeat_count(latency))) {
+          TESTBENCH_LOG(WARN, "increase latency count failed", K(ret), "type", task->get_type(), K(latency));
+        }
+        task->inc_total_apply_cnt();
+        if (OB_FAIL(task->pop())) {
+          TESTBENCH_LOG(WARN, "pop top latency task failed", K(ret));
+        }
+        allocator_.free(latency_task);
       }
-      // TODO: memory leak?
-      allocator_.free(latency_task);
     }
   }
-  if (OB_SUCC(ret)) {
-    TESTBENCH_LOG(TRACE, "process queued tasks succeed");
-  }
-  snapshot_ready_--;
+  TESTBENCH_LOG(INFO, "process queued tasks finished", KR(ret), "type", task->get_type());
   return ret;
 }
 
 int ObTestbenchStatisticsCollector::handle_submit_task_() {
   int ret = OB_SUCCESS;
-  int64_t submit_count = 0;
   for (int64_t i = 0; OB_SUCC(ret) && i < TASK_QUEUE_SIZE; i++) {
     if (submit_queues_[i].get_total_apply_cnt() >= submit_queues_[i].get_total_submit_cnt()) {
       // do nothing
     } else if (OB_FAIL(push_task_(&submit_queues_[i]))) {
       TESTBENCH_LOG(ERROR, "submit queued tasks failed", K(submit_queues_[i]), K(ret));
-    } else {
-      submit_count++;
     }
   }
-  if (OB_SUCC(ret)) {
-    snapshot_ready_ = submit_count;
-    TESTBENCH_LOG(TRACE, "submit queued tasks succeed");
+  return ret;
+}
+
+int ObTestbenchStatisticsCollector::generate_report() {
+  int ret = OB_SUCCESS;
+  unsigned int mode = 0644;
+  int32_t fd = -1;
+  if (OB_FAIL(sync_latency_task())) {
+    TESTBENCH_LOG(ERROR, "push sync latency task failed", KR(ret));
+  } else if (OB_UNLIKELY((fd = ::open(result_file_, O_WRONLY | O_CREAT | O_APPEND, mode))) < 0) {
+    ret = OB_ERR_UNEXPECTED;
+    (void)close(fd);
+    TESTBENCH_LOG(ERROR, "open result file failed", KR(ret), K(fd));
+  } else {
+    int64_t num = 0;
+    while (tg_id_ != -1 && OB_SUCC(TG_GET_QUEUE_NUM(tg_id_, num)) && num > 0) {
+      PAUSE();
+    }
+    static const int64_t max_buf_len = 512;
+    char buf[max_buf_len];
+    for (int64_t i = 0; i < TASK_QUEUE_SIZE; ++i) {
+      if (submit_queues_[i].is_histogram_inited()) {
+        snprintf(buf, max_buf_len, "histogram type:\n%s\n", latency_task_names[i]);
+        ObArray<int64_t> counts;
+        ObArray<double_t> values;
+        if (OB_UNLIKELY(-1 == ::write(fd, buf, strlen(buf)))) {
+          ret = OB_ERR_SYS;
+          TESTBENCH_LOG(ERROR, "write histogram type name failed", KR(ret), "name", latency_task_names[i]);
+        } else if (OB_FAIL(histograms_[i].get_endpoint_values(counts, values))) {
+          TESTBENCH_LOG(ERROR, "get histogram endpoint values failed", KR(ret), "name", latency_task_names[i]);
+        } else {
+          TESTBENCH_LOG(INFO, "write down histogram information", "name", latency_task_names[i], "submit", submit_queues_[i].get_total_submit_cnt(), "apply", submit_queues_[i].get_total_apply_cnt());
+          const char *counts_title = "endpoint counts:\n";
+          if (OB_UNLIKELY(-1 == ::write(fd, counts_title, strlen(counts_title)))) {
+            ret = OB_ERR_SYS;
+            TESTBENCH_LOG(ERROR, "write endpoint counts title failed", KR(ret), KCSTRING(counts_title));
+          }
+          ARRAY_FOREACH(counts, i) {
+            snprintf(buf, max_buf_len, "%ld\n", counts.at(i));
+            if (OB_UNLIKELY(-1 == ::write(fd, buf, strlen(buf)))) {
+              ret = OB_ERR_SYS;
+              TESTBENCH_LOG(ERROR, "write endpoint count line failed", KR(ret), "index", i);
+            }
+          }
+          const char *values_title = "endpoint values:\n";
+          if (OB_UNLIKELY(-1 == ::write(fd, values_title, strlen(values_title)))) {
+            ret = OB_ERR_SYS;
+            TESTBENCH_LOG(ERROR, "write endpoint values title failed", KR(ret), KCSTRING(values_title));
+          }
+          ARRAY_FOREACH(values, i) {
+            snprintf(buf, max_buf_len, "%.3f\n", values.at(i));
+            if (OB_UNLIKELY(-1 == ::write(fd, buf, strlen(buf)))) {
+              ret = OB_ERR_SYS;
+              TESTBENCH_LOG(ERROR, "write endpoint value line failed", KR(ret), "index", i);
+            }
+          }
+          snprintf(buf, max_buf_len, "end\n");
+          if (OB_UNLIKELY(-1 == ::write(fd, buf, strlen(buf)))) {
+            ret = OB_ERR_SYS;
+            TESTBENCH_LOG(ERROR, "write blank line failed", KR(ret));
+          }
+        }
+      }
+    }
   }
+  (void)close(fd);
   return ret;
 }
 

@@ -17,10 +17,9 @@ public:
   int argc = 19;
   const char *argv_const[19] = {
     "dummy",
-    "-H", "~/scheduler",
     "-l", "INFO",
     "-t", "5",
-    "-c", "host=127.0.0.1,user=root@tb,port=2881,database=test,table=testbench",
+    "-c", "host=127.0.0.1,user=root,port=2881,database=test,table=testbench",
     "-d", "partitions=9,rows=10000",
     "-s", "capacity=500,minimum=10,maximum=80,threads=1,tasks=99999",
     "-T", "threads=50,tasks=100,participants=1,operations=10",
@@ -41,10 +40,9 @@ TEST_F(TestOptionsParser, parse_all_options) {
   EXPECT_EQ(OB_LOG_LEVEL_WDIAG, opts.log_level_);
   EXPECT_EQ(0, strcmp("log", opts.log_dir_));
   EXPECT_EQ(0, strcmp("log/scheduler.log", opts.log_file_));
-  EXPECT_EQ(0, strcmp("~/scheduler", opts.home_path_));
   EXPECT_EQ(5, opts.duration_);
   EXPECT_EQ(0, strcmp("127.0.0.1", opts.connection_opts_->get_cluster_host()));
-  EXPECT_EQ(0, strcmp("root@tb", opts.connection_opts_->get_cluster_user()));
+  EXPECT_EQ(0, strcmp("root", opts.connection_opts_->get_cluster_user()));
   EXPECT_EQ(2881, opts.connection_opts_->get_cluster_port());
   EXPECT_EQ(0, strcmp("", opts.connection_opts_->get_cluster_pass()));
   EXPECT_EQ(0, strcmp("test", opts.connection_opts_->get_cluster_db_name()));

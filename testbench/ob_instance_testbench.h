@@ -117,16 +117,6 @@ parse_short_opt(const int c, const char *value, ObTestbenchOptions &opts) {
   case 'h':
     print_help();
     break;
-  case 'H':
-    if (OB_ISNULL(value)) {
-      MPRINTx("invalid home path param");
-    } else if (FALSE_IT(w_len = snprintf(opts.home_path_, OB_MAX_CONTEXT_STRING_LENGTH, "%s", value))) {
-      // impossible
-    } else if (OB_UNLIKELY(w_len <= 0) || OB_UNLIKELY(w_len > OB_MAX_CONTEXT_STRING_LENGTH)) {
-      MPRINTx("set home_path error: %s", value);
-    }
-    MPRINT("set home path: %s", value);
-    break;
   case 'l':
     if (OB_FAIL(OB_LOGGER.level_str2int(value, opts.log_level_))) {
       MPRINT("malformed log level, candicates are: "

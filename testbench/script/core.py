@@ -21,6 +21,10 @@
 from __future__ import absolute_import, division, print_function
 
 import os
+import bisect
+import numpy as np
+import matplotlib.pyplot as plt
+from matplotlib.font_manager import FontProperties 
 
 from cluster import ClusterManager
 from dataset import DatasetManager
@@ -85,6 +89,7 @@ class TestBench(object):
             self._repository_manager = RepositoryManager(self._home_path, self.stdio)
         return self._repository_manager
 
+    ###############################################          ClusterMajorCommand          ##########################################
     def _create_workspace(self):
         def mkdir_workspace(name, server):
             if not DirectoryUtil.mkdir(server.get_conf("work_space"), 0o755, self.stdio):
@@ -245,30 +250,6 @@ class TestBench(object):
         )
         return True
 
-    def start_scheduler(self):
-        config = getattr(self._opts, "config", "")
-        if not self.scheduler_manager.create_yaml(config):
-            self.stdio.error(
-                "Fail to load workload config for testbench {}".format(config)
-            )
-            return False
-        component = self.scheduler_manager.component
-        repo = self.repository_manager.get_repository(component)
-        if not repo:
-            self.stdio.error(
-                "Fail to find binary file for component {}".format(component)
-            )
-            return False
-
-        self.scheduler_manager.repo = repo
-        ret = LocalClient.execute_command(self.scheduler_manager.cmd, stdio=self.stdio)
-        self.stdio.verbose("return code: {}".format(ret.code))
-        self.stdio.verbose("stdout: {}".format(ret.stdout))
-        self.stdio.verbose("stderr: {}".format(ret.stderr))
-        if ret.stderr or ret.code:
-            return False
-        return True
-
     def create_tenant(self):
         unit_name = "tb_unit"
         pool_name = "tb_pool"
@@ -383,6 +364,31 @@ class TestBench(object):
             self.stdio.error("Create tenant exception {}".format(e.args))
             return False
         return is_tenant_exist()
+    
+    ###############################################          BenchMajorCommand          ##########################################
+    def start_scheduler(self):
+        config = getattr(self._opts, "config", "")
+        if not self.scheduler_manager.create_yaml(config):
+            self.stdio.error(
+                "Fail to load workload config for testbench {}".format(config)
+            )
+            return False
+        component = self.scheduler_manager.component
+        repo = self.repository_manager.get_repository(component)
+        if not repo:
+            self.stdio.error(
+                "Fail to find binary file for component {}".format(component)
+            )
+            return False
+
+        self.scheduler_manager.repo = repo
+        ret = LocalClient.execute_command(self.scheduler_manager.cmd, stdio=self.stdio)
+        if ret.stderr or ret.code:
+            self.stdio.error(
+                "Fail to start benchmark scheduler, code: {}, stdout: {}, stderr: {}".format(ret.code, ret.stdout, ret.stderr)
+            )
+            return False
+        return True
     
     def generate_dataset(self):
         force_mode = getattr(self._opts, "force", False)
@@ -598,4 +604,147 @@ class TestBench(object):
         except MySQL.DatabaseError as e:
             self.stdio.error("enable lcl exception {}".format(e.args))
             return False
+        return True
+    
+    def enable_mocknet(self):
+        config = getattr(self._opts, "config", "")
+        if not self.cluster_manager.create_yaml(config):
+            self.stdio.error(
+                "Fail to load cluster config for testbench {}".format(config)
+            )
+            return False
+        rpc_port_list = self.cluster_manager.get_rpc_port_list()
+        delay = getattr(self._opts, "delay", "0")
+        loss = getattr(self._opts, "loss", "0")
+        add_qdisc_cmd = "sudo tc qdisc add dev lo root handle 1: prio bands 4"
+        self.stdio.verbose("start command {}".format(add_qdisc_cmd))
+        ret = LocalClient.execute_command(add_qdisc_cmd, stdio=self.stdio)
+        if ret.stderr or ret.code:
+            self.stdio.error(
+                "Fail to add qdisc to tc root, code: {}, stdout: {}, stderr: {}".format(ret.code, ret.stdout, ret.stderr)
+            )
+            return False
+        add_net_env_cmd = "sudo tc qdisc add dev lo parent 1:4 handle 40: netem delay {}ms loss {}%".format(delay, loss)
+        self.stdio.verbose("start command {}".format(add_net_env_cmd))
+        ret = LocalClient.execute_command(add_net_env_cmd, stdio=self.stdio)
+        if ret.stderr or ret.code:
+            self.stdio.error(
+                "Fail to set network delay and packet loss, code: {}, stdout: {}, stderr: {}".format(ret.code, ret.stdout, ret.stderr)
+            )
+            return False
+        for port in rpc_port_list:
+            add_filter = "sudo tc filter add dev lo protocol ip parent 1:0 prio 4 u32 match ip dport {} 0xffff flowid 1:4".format(port)
+            self.stdio.verbose("start command {}".format(add_filter))
+            ret = LocalClient.execute_command(add_filter, stdio=self.stdio)
+            if ret.stderr or ret.code:
+                self.stdio.error(
+                    "Fail to add filter for server port, code: {}, stdout: {}, stderr: {}".format(ret.code, ret.stdout, ret.stderr)
+                )
+                return False        
+        return True
+    
+    def disable_mocknet(self):
+        remove_filter_cmd = "sudo tc filter del dev lo pref 4"
+        self.stdio.verbose("start command {}".format(remove_filter_cmd))
+        ret = LocalClient.execute_command(remove_filter_cmd, stdio=self.stdio)
+        if ret.stderr or ret.code:
+            self.stdio.error(
+                "Fail to remove filters, code: {}, stdout: {}, stderr: {}".format(ret.code, ret.stdout, ret.stderr)
+            )
+            return False
+        remove_qdisc_cmd = "sudo tc qdisc del dev lo root handle 1: prio bands 4"
+        self.stdio.verbose("start command {}".format(remove_qdisc_cmd))
+        ret = LocalClient.execute_command(remove_qdisc_cmd, stdio=self.stdio)
+        if ret.stderr or ret.code:
+            self.stdio.error(
+                "Fail to remove the qdisc, code: {}, stdout: {}, stderr: {}".format(ret.code, ret.stdout, ret.stderr)
+            )
+            return False
+        return True
+    
+    ###############################################          ReportMajorCommand          ##########################################
+    def analyze_result(self):
+        directory = getattr(self._opts, "directory", "")
+        result = os.path.join(directory, "scheduler.result")
+        file = open(result, "r")
+        histogram_type = None
+        endpoint_counts = []
+        endpoint_values = []
+        is_value = False
+        type_name_map = {
+            "distributed_txn": "分布式事务延迟",
+            "contention_txn": "冲突事务延迟",
+            "deadlock_txn": "全局死锁事务延迟",
+            "concurrent_txn": "读写事务延迟",
+            "commit": "事务提交操作延迟",
+            "lock": "事务冲突操作等锁时间",
+            "deadlock": "死锁环路检测与消除延迟",
+            "election": "选主时间",
+            "rollback_txn": "回滚事务延迟",            
+        }
+        while True:
+            line = file.readline().strip("\n").strip()
+            if not line:
+                break
+            elif line == "end":
+                if not self._analyze_histogram(histogram_type, type_name_map[histogram_type], endpoint_values, endpoint_counts, directory):
+                    self.stdio.error(
+                        "Fail to analyze histogram data, type: {}, values: {}, counts: {}".format(histogram_type, endpoint_values, endpoint_counts)
+                    )
+                    return False
+                endpoint_counts = []
+                endpoint_values = []
+            elif line == "histogram type:":
+                histogram_type = file.readline().strip("\n")
+            elif line == "endpoint counts:":
+                is_value = False
+            elif line == "endpoint values:":
+                is_value = True
+            elif is_value:
+                endpoint_values.append(float(line))
+            else:
+                endpoint_counts.append(int(line))
+        file.close()
+        return True
+    
+    def _analyze_histogram(self, type, type_name, values, counts, directory):
+        font_path = getattr(self._opts, "font", "")
+        font = FontProperties(fname=font_path, size=14)
+        plt.rcParams['pdf.fonttype'] = 42
+        
+        # trim leading and trailing zeros
+        self.stdio.verbose("type: {}, values(len={}): {}, counts(len={}): {}".format(type, len(values), values, len(counts), counts))
+        second = int(getattr(self._opts, "second", "1"))
+        while counts and counts[0] == 0:
+            counts.pop(0)
+            values.pop(0)
+        while counts and counts[-1] == 0:
+            counts.pop()
+            values.pop()
+            
+        total_count = np.sum(counts)
+        cdf = np.cumsum(counts) / total_count        
+        cdf_path = os.path.join(directory, "{}-cdf.pdf".format(type))
+        plt.figure()
+        plt.plot(values, cdf, marker="o")
+        plt.xlabel("延迟（毫秒）", fontproperties=font)
+        plt.ylabel("累积分布概率", fontproperties=font)
+        plt.title("{}的经验累积分布函数图".format(type_name), fontproperties=font)
+        plt.grid(True)
+        plt.savefig(cdf_path, format="pdf", bbox_inches="tight")
+        
+        bucket_width = (values[1] - values[0]) / 2 
+        summary_path = os.path.join(directory, "summary.result")
+        file = open(summary_path, "a")
+        file.write("type:\n{}\n".format(type))
+        file.write("count:\n{}\n".format(total_count))
+        file.write("tps:\n{:.3f}\n".format(total_count / second))
+        file.write("min:\n{}\n".format(values[0]))
+        file.write("max:\n{}\n".format(values[-1]))
+        file.write("avg:\n{:.3f}\n".format(sum((values[i] - bucket_width) * counts[i] for i in range(0, len(counts))) / total_count))
+        file.write("50%:\n{}\n".format(values[bisect.bisect_left(cdf, 0.5)]))
+        file.write("90%:\n{}\n".format(values[bisect.bisect_left(cdf, 0.9)]))
+        file.write("99%:\n{}\n".format(values[bisect.bisect_left(cdf, 0.99)]))
+        file.write("\n")
+        file.close()
         return True

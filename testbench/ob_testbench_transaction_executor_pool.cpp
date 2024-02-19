@@ -111,6 +111,8 @@ void ObTestbenchTransactionExecutorPool::handle(void *task) {
     TESTBENCH_LOG(ERROR, "transaction task execute failed", KR(ret));
   } else if (OB_FAIL(task_to_handle->release_dblinks())) {
     TESTBENCH_LOG(ERROR, "transaction task release dblinks failed", KR(ret));
+  } else if (OB_FAIL(task_to_handle->collect_statistics())) {
+    TESTBENCH_LOG(ERROR, "transaction task collect statistics failed", KR(ret));
   }
   inc_finish_task();
   allocator_.free(task_to_handle);

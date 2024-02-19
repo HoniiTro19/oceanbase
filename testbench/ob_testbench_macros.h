@@ -157,6 +157,33 @@ namespace testbench
 #undef X
 
 /*
+                                          latency task type macros
+*/
+#define LATENCY_TYPE_OPTIONS                          \
+  X(INVALID_LATENCY_TASK, "invalid")                  \
+  X(RPC_LATENCY_TASK, "rpc")                          \
+  X(DISTRIBUTED_TXN_LATENCY_TASK, "distributed_txn")  \
+  X(CONTENTION_TXN_LATENCY_TASK, "contention_txn")    \
+  X(DEADLOCK_TXN_LATENCY_TASK, "deadlock_txn")        \
+  X(CONCURRENT_TXN_LATENCY_TASK, "concurrent_txn")    \
+  X(COMMIT_SQL_LATENCY_TASK, "commit")                \
+  X(LOCK_SQL_LATENCY_TASK, "lock")                    \
+  X(DEADLOCK_SQL_LATENCY_TASK, "deadlock")            \
+  X(ELECTION_LATENCY_TASK, "election")                \
+  X(ROLLBACK_TXN_LATENCY_TASK, "rollback_txn")        \
+  X(LATENCY_TASK_TYPE_CNT, "end")  
+
+#define X(key, value) key,
+enum ObLatencyTaskType {
+  LATENCY_TYPE_OPTIONS
+};
+#undef X
+
+#define X(key, value) value,
+const char *const latency_task_names[] = { LATENCY_TYPE_OPTIONS };
+#undef X
+
+/*
                                           code segment timer macros
 */
 

@@ -162,6 +162,22 @@ int ObHistogram::get_percentage_value(double_t percentage, common::ObObj &value)
   return ret;
 }
 
+int ObHistogram::get_endpoint_values(ObArray<int64_t> &counts, ObArray<double_t> &values)
+{
+  int ret = OB_SUCCESS;
+  counts.reset();
+  values.reset();
+  for (int64_t i = 0; i < buckets_.count(); ++i) {
+    ObHistBucket &bucket = buckets_.at(i);
+    if (OB_FAIL(counts.push_back(bucket.endpoint_repeat_dynamic_count_))) {
+      LOG_WARN("push back endpoint repeat dynamic count failed", K(ret));
+    } else if (OB_FAIL(values.push_back(bucket.endpoint_value_.get_double()))) {
+      LOG_WARN("push back endpoint value failed", K(ret));
+    }
+  }
+  return ret;
+}
+
 int ObHistogram::prepare_allocate_buckets(ObIAllocator &allocator, const int64_t bucket_size)
 {
   int ret = OB_SUCCESS;

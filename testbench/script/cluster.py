@@ -280,3 +280,15 @@ class ClusterManager(Manager):
             self.stdio.error("Fail to clear cluster directory {}.".format(self.path))
             return False
         return True
+    
+    def get_rpc_port_list(self):
+        rpc_port_list = []
+        for _, server in self._server_config.items():
+            port = server.get_conf("rpc_port")
+            if not port:
+                self.stdio.warn(
+                    "Cannot get rpc port from server config."
+                )
+            else:
+                rpc_port_list.append(port)
+        return rpc_port_list

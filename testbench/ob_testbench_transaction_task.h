@@ -152,10 +152,11 @@ namespace oceanbase
       INHERIT_TO_STRING_KV("ObIWorkloadTransactionTask", ObIWorkloadTransactionTask, K_(chains), K_(lock_deadlock_sql));
     
     private:
-      int push_forward_operations(int64_t conn_idx, int64_t cycle);
+      int push_forward_operations(int64_t conn_idx);
 
     private:
       int64_t chains_;
+      int64_t cycle_;
       const char *lock_deadlock_sql_format_;
       const char *lock_multi_deadlock_sql_format_;
       ObSqlString lock_deadlock_sql_;

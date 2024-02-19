@@ -2,14 +2,13 @@
 instance_testbench:
   global:
     # common parameters
-    home_path: ~/scheduler
     log_level: INFO
     time: 1
   statistics:
     # for statistics collector
     capacity: 500
     minimum: 10
-    maximum: 80
+    maximum: 50
     threads: 1
     tasks: 99999
   connection:
@@ -24,8 +23,9 @@ instance_testbench:
     # for dataset parameteres
     partitions: 9
     rows: 1000000
-  distributed:
-    threads: 10
+  contention:
+    threads: 5
     tasks: 99999
-    participants: 1
+    concurrency: 5
     operations: 10
+    aborts: 0
