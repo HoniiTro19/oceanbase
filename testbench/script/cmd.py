@@ -317,7 +317,7 @@ class ClusterDeployCommand(TestBenchCommand):
         )
 
     def _check(self):
-        config = getattr(self.opts, "config", "")
+        config = getattr(self.opts, "config", None)
         if not config:
             ROOT_IO.error("Fail to deploy a cluster without configuration file.")
             return False
@@ -389,7 +389,7 @@ class BenchDataCommand(TestBenchCommand):
         )
         
     def _check(self):
-        config = getattr(self.opts, "config", "")
+        config = getattr(self.opts, "config", None)
         if not config:
             ROOT_IO.error("Fail to generate dataset without configuration file.")
             return False
@@ -400,6 +400,7 @@ class BenchDataCommand(TestBenchCommand):
         return True
 
     def _do_command(self, tb):
+        self._do_step("Checking options.", self._check)
         self._do_step("Generating datasets for the benchmark table.", tb.generate_dataset)
 
 
@@ -413,7 +414,7 @@ class BenchLoadCommand(TestBenchCommand):
         )
     
     def _check(self):
-        config = getattr(self.opts, "config", "")
+        config = getattr(self.opts, "config", None)
         if not config:
             ROOT_IO.error("Fail to generate dataset without configuration file.")
             return False
@@ -424,6 +425,7 @@ class BenchLoadCommand(TestBenchCommand):
         return True
 
     def _do_command(self, tb):
+        self._do_step("Checking options.", self._check)
         self._do_step("Generating datasets for the benchmark table.", tb.generate_dataset)
         self._do_step("Clearing schemas for the benchmark table.", tb.clear_schema)
         self._do_step("Creating schemas for the benchmark table.", tb.generate_schema)
@@ -446,7 +448,7 @@ class BenchTestCommand(TestBenchCommand):
         )
     
     def _check(self):
-        config = getattr(self.opts, "config", "")
+        config = getattr(self.opts, "config", None)
         if not config:
             ROOT_IO.error("Fail to start transaction scheduler without configuration file.")
             return False
@@ -457,6 +459,7 @@ class BenchTestCommand(TestBenchCommand):
         return True
 
     def _do_command(self, tb):
+        self._do_step("Checking options.", self._check)
         need_elr = getattr(self.opts, "elr", False)
         need_lcl = getattr(self.opts, "lcl", False)
         if need_elr:
@@ -485,7 +488,7 @@ class BenchMocknetCommand(TestBenchCommand):
         )
     
     def _check(self):
-        config = getattr(self.opts, "config", "")
+        config = getattr(self.opts, "config", None)
         if not config:
             ROOT_IO.error("Fail to set mocknet without cluster configuration file.")
             return False
@@ -493,21 +496,68 @@ class BenchMocknetCommand(TestBenchCommand):
             ROOT_IO.error("Configuration file {} does not exists.".format(config))
             return False
         
+        delay = int(getattr(self.opts, "delay", "0"))
+        if delay < 0:
+            ROOT_IO.error("Network delay get {}, which should not be less than 0.".format(delay))
+            return False
+        
         loss = int(getattr(self.opts, "loss", "0"))
         if loss > 100 or loss < 0:
-            ROOT_IO.error("Network packet loss rate get {}, which should be in the range [0, 100]".format(loss))
+            ROOT_IO.error("Network packet loss rate get {}, which should be in the range [0, 100].".format(loss))
             return False
         return True
     
     def _do_command(self, tb):
+        self._do_step("Checking options.", self._check)
         self._do_step("Simulating network environment.", tb.enable_mocknet)
         self._do_step("Reseting network environment.", tb.disable_mocknet)
         
 class ReportMajorCommand(MajorCommand):
     def __init__(self):
         super(ReportMajorCommand, self).__init__(
-            "report", "Generate statistic report for a benchmarking process."
+            "report", 
+            "Generate statistic report for a benchmarking process."
         )
+        self.register_command(ReportHistogramInfo())
+        
+class ReportHistogramInfo(TestBenchCommand):
+    def __init__(self):
+        super(ReportHistogramInfo, self).__init__(
+            "histogram", 
+            "Load scheduler.result and analyze the histogram information."
+        )
+        self.parser.add_option(
+            "-d", "--directory", type="string", help="Path to the benchmark log directory."
+        )
+        self.parser.add_option(
+            "-f", "--font", type="string", help="Path to chinese font."
+        )
+        self.parser.add_option(
+            "-s", "--second", type="int", help="Time elapsed during benchmark tool execution."
+        )
+        
+    def _check(self):
+        directory = getattr(self.opts, "directory", None)
+        if not directory:
+            ROOT_IO.error("Fail to get statistics collector histogram information directory.")
+            return False
+        result = os.path.join(directory, "scheduler.result")
+        if not os.path.exists(result):
+            ROOT_IO.error("Result file scheduler.result does not exists, {}.".format(result))
+            return False
+        font = getattr(self.opts, "font", None)
+        if font and not os.path.exists(font):
+            ROOT_IO.error("Font file does not exists, {}.".format(font))
+            return False
+        second = int(getattr(self.opts, "second", "-1"))
+        if second <= 0:
+            ROOT_IO.error("Option second is necessary and should be greater than 0.")
+            return False
+        return True
+    
+    def _do_command(self, tb):
+        self._do_step("Checking options.", self._check)
+        self._do_step("Analyzing the histogram information.", tb.analyze_result)
 
 
 class MainCommand(MajorCommand):
@@ -515,6 +565,7 @@ class MainCommand(MajorCommand):
         super(MainCommand, self).__init__("testbench", "")
         self.register_command(ClusterMajorCommand())
         self.register_command(BenchMajorCommand())
+        self.register_command(ReportMajorCommand())
 
 
 if __name__ == "__main__":

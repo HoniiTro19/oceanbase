@@ -116,7 +116,6 @@ public:
   int get_percentage_latency(ObLatencyTaskType type, double_t percentage, double_t &latency);
   const ObHistogram &get_histogram(ObLatencyTaskType type) const;
   const ObStatisticsQueueTask &get_queue_task(ObLatencyTaskType type) const;
-  int init_histogram_(ObStatisticsQueueTask *task);
   // NOTE: latency task pushed after this api will be ignored
   int generate_report();
   inline int get_tg_id() const { return tg_id_; }

@@ -335,11 +335,6 @@ void ObTestbenchStatisticsCollector::handle(void *task) {
   }
 }
 
-int ObTestbenchStatisticsCollector::init_histogram_(ObStatisticsQueueTask *task) {
-  int ret = OB_SUCCESS;
-  return ret;
-}
-
 int ObTestbenchStatisticsCollector::handle_queue_task_(ObStatisticsQueueTask *task) {
   int ret = OB_SUCCESS;
   int64_t index = task->get_index();
@@ -365,7 +360,7 @@ int ObTestbenchStatisticsCollector::handle_queue_task_(ObStatisticsQueueTask *ta
       }
     }
     std::sort(buffer.begin(), buffer.end());
-    int64_t q99_index = 999 * (task_cnt - 1) / 1000;
+    int64_t q99_index = 99 * (task_cnt - 1) / 100;
     int64_t q0_value = buffer[0].get_int();
     int64_t q99_value = buffer[q99_index].get_int();
     double_t bucket_width = static_cast<double_t>(q99_value - q0_value) / (bucket_capacity_ * (bucket_max_ratio_ - bucket_min_ratio_));
