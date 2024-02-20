@@ -373,7 +373,7 @@ WorkloadType ObDistributedTransactionTask::get_type()
                                         ObContentionTransactionTask
 */
 ObContentionTransactionTask::ObContentionTransactionTask(BasicTaskConfig basic_config, int64_t aborts, int64_t operations) 
-: ObIWorkloadTransactionTask(basic_config), begin_trace_cnt_(0), end_trace_cnt_(0), aborts_(aborts), operations_(operations), lock_contention_sql_(), finished_(0), act_commits_(0)
+: ObIWorkloadTransactionTask(basic_config), aborts_(aborts), operations_(operations), lock_contention_sql_(), finished_(0), act_commits_(0)
 {
   lock_contention_sql_format_ = "UPDATE %s SET lock_elr = lock_elr + 1 WHERE partition_id = ? AND row_id = ?;";
 }
@@ -446,9 +446,6 @@ int ObContentionTransactionTask::execute_transactions()
     }
     TESTBENCH_LOG(DEBUG, "check connections operations status", K_(act_operations));
   }
-  if (begin_trace_cnt_ != connection_count_ || end_trace_cnt_ != connection_count_) {
-    TESTBENCH_LOG(ERROR, "check trace", K_(begin_trace_cnt), K_(end_trace_cnt));
-  }
   return ret;
 }
 
@@ -501,12 +498,12 @@ int ObContentionTransactionTask::push_forward_operations(int64_t conn_idx, int64
       ObMySQLPreparedStatement &stmt = lock_contention_stmts_.at(conn_idx);
       ObMySQLConnection *conn = connections_.at(conn_idx);
       begin_trace_latency(latencys_.at(conn_idx));
-      ++begin_trace_cnt_;
       if (OB_FAIL(bind_params(parameters_.at(contention_partition_id), contention_row_id, stmt))) {
         TESTBENCH_LOG(WARN, "bind parameters for statement failed", KR(ret), "partition", parameters_.at(contention_partition_id), "row", contention_row_id);
       } else if (OB_FAIL(connections_.at(conn_idx)->execute_write_async(stmt))) {
         TESTBENCH_LOG(WARN, "execute write async failed", KR(ret));
       }
+      TESTBENCH_LOG(TRACE, "execute contention row", K(conn_idx), K_(act_operations));
       ++act_operations_.at(conn_idx);
       if (OB_FAIL(ret)) {
         commits_.at(conn_idx) = false;
@@ -514,7 +511,6 @@ int ObContentionTransactionTask::push_forward_operations(int64_t conn_idx, int64
     } else if (act_operations_.at(conn_idx) < operations_) {
       if (act_operations_.at(conn_idx) == 1) {
         end_trace_latency(latencys_.at(conn_idx));
-        ++end_trace_cnt_;
       }
       ObMySQLPreparedStatement &stmt = lock_contention_stmts_.at(conn_idx);
       ObMySQLConnection *conn = connections_.at(conn_idx);
@@ -523,12 +519,16 @@ int ObContentionTransactionTask::push_forward_operations(int64_t conn_idx, int64
       } else if (OB_FAIL(connections_.at(conn_idx)->execute_write_async(stmt))) {
         TESTBENCH_LOG(WARN, "execute write async failed", KR(ret));
       }
+      TESTBENCH_LOG(TRACE, "execute non-contention row", K(conn_idx), K(current_row_id), K_(act_operations), K_(latencys), K_(cumulative_latencys));
       current_row_id += 1;
       ++act_operations_.at(conn_idx);
       if (OB_FAIL(ret)) {
         commits_.at(conn_idx) = false;
       }
     } else if (act_operations_.at(conn_idx) == operations_) {
+      if (act_operations_.at(conn_idx) == 1) {
+        end_trace_latency(latencys_.at(conn_idx));
+      }
       // commit or abort transactions
       int64_t commits = connection_count_ - aborts_;
       bool commit = commits_.at(conn_idx) && act_commits_ < commits;
@@ -538,11 +538,13 @@ int ObContentionTransactionTask::push_forward_operations(int64_t conn_idx, int64
           TESTBENCH_LOG(WARN, "execute commit transaction async failed", KR(ret));
         }
         ++act_commits_;
+        TESTBENCH_LOG(TRACE, "execute contention transaction commit", K(conn_idx), K_(act_operations), K_(act_commits));
       } else {
         if (OB_FAIL(connections_.at(conn_idx)->rollback_async())) {
           TESTBENCH_LOG(WARN, "execute rollback transaction async failed", KR(ret));
         }
         commits_.at(conn_idx) = false;
+        TESTBENCH_LOG(TRACE, "execute contention transaction abort", K(conn_idx), K_(act_operations), K_(act_commits));
       }
       ++act_operations_.at(conn_idx);
       if (OB_FAIL(ret)) {
