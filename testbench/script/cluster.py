@@ -63,7 +63,7 @@ class Server(object):
         return self._get_pid_path()
 
     def _parse_cmd(self):
-        return "cd {}; {} {}".format(
+        return "cd {}; numactl --cpunodebind=0 {} {}".format(
             self.get_conf("work_space"), self.repo, " ".join(self._cmds)
         )
 

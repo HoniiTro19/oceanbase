@@ -109,7 +109,7 @@ class SchedulerManager(Manager):
             else:
                 self.stdio.warn("get unknown options {}:{}".format(name, config))
         self.stdio.verbose("parse cmds {}".format(cmds))
-        return "cd {}; {} {}".format(self.trace_path, self.repo, " ".join(cmds))
+        return "cd {}; numactl --cpunodebind=1 {} {}".format(self.trace_path, self.repo, " ".join(cmds))
 
     def _lock(self, read_only=False):
         if self._lock_manager:
