@@ -188,10 +188,10 @@ int ObTestbenchBuilder::start_service() {
 void ObTestbenchBuilder::stop_service() {
   int ret = OB_SUCCESS;
   transaction_scheduler_.destroy();
-  executor_pool_.destroy();
   if (OB_FAIL(statistics_collector_.generate_report())) {
     TESTBENCH_LOG(ERROR, "statistics collector generate report failed", KR(ret));
   }
+  executor_pool_.destroy();
   statistics_collector_.destroy();
   sql_proxy_.destroy();
   opts_->destroy_options();

@@ -35,6 +35,8 @@ namespace oceanbase
     typedef ObArray<uint64_t> Dblinks;
     typedef ObArray<bool> Readonlys;
 
+    constexpr int OB_DEADLOCK = 1213;
+
     struct BasicTaskConfig {
       const char *table_name;
       int64_t connections;
