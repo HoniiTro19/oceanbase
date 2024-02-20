@@ -191,7 +191,7 @@ const char *const latency_task_names[] = { LATENCY_TYPE_OPTIONS };
   int64_t begin_time = common::ObTimeUtility::current_time();       \
   seg;                                                              \
   int64_t end_time = common::ObTimeUtility::current_time();         \
-  TESTBENCH_LOG(DEBUG, name, "time", end_time - begin_time);        \
+  TESTBENCH_LOG(INFO, name, "time", end_time - begin_time);        \
 
 #define TIMER_RET(name, seg)                                        \
   {                                                                 \

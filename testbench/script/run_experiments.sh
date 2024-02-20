@@ -70,7 +70,7 @@ function distributed_transaction() {
         check_cmd_status "run distributed transaction"
         testbench bench resetnet
         check_cmd_status "reset network environment"
-        testbench report histogram -d ~/.testbench/scheduler/$trace/log -f ~/linux-fonts/simsun.ttc -s 5
+        testbench report histogram -d ~/.testbench/scheduler/$trace/log -f ~/linux-fonts/simsun.ttc -s 300
         check_cmd_status "analyze histogram"
 
         destroy_cluster
@@ -80,12 +80,9 @@ function distributed_transaction() {
 }
 
 function contention_transaction() {
-  # delays=(1 20 50 100)
-  # concurrencys=(5 10 15 20)
-  # operations=(1 5 10 15 20)
-  delays=(1)
-  concurrencys=(5)
-  operations=(1)
+  delays=(1 20 50 100)
+  concurrencys=(5 10 15 20)
+  operations=(1 5 10 15 20)
   workload_config="$CONFIG/workload/contention_transaction.yaml"
   check_file_exists $workload_config
   for delay in ${delays[@]}; do
@@ -96,15 +93,15 @@ function contention_transaction() {
         sed -i "s/operations:.*/operations: $operation/" $workload_config
         check_cmd_status "update config operations"
 
-        # deploy_cluster
+        deploy_cluster
 
         sed -i "s/time:.*/time: 1/" $workload_config
         check_cmd_status "update config time"
         time=$(date -u +%FT%T%z)
         trace="contentiontransaction-concurrency$concurrency-operations$operation-delay$delay-$time"
-        # testbench bench test -c $workload_config -t "$trace-warmup" -e
-        # check_cmd_status "contention transaction warmup"
-        sed -i "s/time:.*/time: 1/" $workload_config
+        testbench bench test -c $workload_config -t "$trace-warmup" -e
+        check_cmd_status "contention transaction warmup"
+        sed -i "s/time:.*/time: 5/" $workload_config
         check_cmd_status "update config time"
         testbench bench mocknet -c $cluster_config -d $delay -l 0
         check_cmd_status "simulate network environment"
@@ -112,22 +109,19 @@ function contention_transaction() {
         check_cmd_status "run contention transaction"
         testbench bench resetnet
         check_cmd_status "reset network environment"
-        testbench report histogram -d ~/.testbench/scheduler/$trace/log -f ~/linux-fonts/simsun.ttc -s 1
+        testbench report histogram -d ~/.testbench/scheduler/$trace/log -f ~/linux-fonts/simsun.ttc -s 300
         check_cmd_status "analyze histogram"      
 
-        # destroy_cluster
+        destroy_cluster
       done
     done
   done
 }
 
 function deadlock_transaction() {
-  # delays=(1 20 50 100)
-  # concurrencys=(6 12 18 24 30)
-  # chains=(1 2 3)
-  delays=(1)
-  concurrencys=(6)
-  chains=(1)
+  delays=(1 20 50 100)
+  concurrencys=(6 12 18 24 30)
+  chains=(1 2 3)
   workload_config="$CONFIG/workload/deadlock_transaction.yaml"
   check_file_exists $workload_config
   for delay in ${delays[@]}; do
@@ -138,7 +132,7 @@ function deadlock_transaction() {
         sed -i "s/chains:.*/chains: $chain/" $workload_config
         check_cmd_status "update config chains"
 
-        # deploy_cluster
+        deploy_cluster
 
         sed -i "s/time:.*/time: 1/" $workload_config
         check_cmd_status "update config time"
@@ -146,7 +140,7 @@ function deadlock_transaction() {
         trace="deadlocktransaction-concurrency$concurrency-chains$chain-delay$delay-$time"
         testbench bench test -c $workload_config -t "$trace-warmup" -l
         check_cmd_status "deadlock transaction warmup"
-        sed -i "s/time:.*/time: 1/" $workload_config
+        sed -i "s/time:.*/time: 5/" $workload_config
         check_cmd_status "update config time"
         testbench bench mocknet -c $cluster_config -d $delay -l 0
         check_cmd_status "simulate network environment"
@@ -154,22 +148,19 @@ function deadlock_transaction() {
         check_cmd_status "run deadlock transaction"
         testbench bench resetnet
         check_cmd_status "reset network environment"
-        testbench report histogram -d ~/.testbench/scheduler/$trace/log -f ~/linux-fonts/simsun.ttc -s 1
+        testbench report histogram -d ~/.testbench/scheduler/$trace/log -f ~/linux-fonts/simsun.ttc -s 300
         check_cmd_status "analyze histogram"    
       
-        # destroy_cluster
+        destroy_cluster
       done
     done
   done
 }
 
 function concurrent_transaction() {
-  # delays=(1 20 50 100)
-  # operations=(0 10 20 30)
-  # readonlys=(0 20 40 60 80 100)
-  delays=(1)
-  operations=(10)
-  readonlys=(0)
+  delays=(1 20 50 100)
+  operations=(0 10 20 30)
+  readonlys=(0 20 40 60 80 100)
   workload_config="$CONFIG/workload/concurrent_transaction.yaml"
   check_file_exists $workload_config
   for delay in ${delays[@]}; do
@@ -180,7 +171,7 @@ function concurrent_transaction() {
         sed -i "s/readonly:.*/readonly: $readonly/" $workload_config
         check_cmd_status "update config readonly"
 
-        # deploy_cluster
+        deploy_cluster
 
         sed -i "s/time:.*/time: 1/" $workload_config
         check_cmd_status "update config time"
@@ -188,7 +179,7 @@ function concurrent_transaction() {
         trace="concurrenttransaction-operations$operation-readonly$readonly-delay$delay-$time"
         testbench bench test -c $workload_config -t "$trace-warmup"
         check_cmd_status "concurrent transaction warmup"
-        sed -i "s/time:.*/time: 1/" $workload_config
+        sed -i "s/time:.*/time: 5/" $workload_config
         check_cmd_status "update config time"
         testbench bench mocknet -c $cluster_config -d $delay -l 0
         check_cmd_status "simulate network environment"
@@ -196,10 +187,10 @@ function concurrent_transaction() {
         check_cmd_status "run concurrent transaction"
         testbench bench resetnet
         check_cmd_status "reset network environment"
-        testbench report histogram -d ~/.testbench/scheduler/$trace/log -f ~/linux-fonts/simsun.ttc -s 1
+        testbench report histogram -d ~/.testbench/scheduler/$trace/log -f ~/linux-fonts/simsun.ttc -s 300
         check_cmd_status "analyze histogram"   
       
-        # destroy_cluster
+        destroy_cluster
       done
     done
   done

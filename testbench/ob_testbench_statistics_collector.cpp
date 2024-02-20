@@ -320,7 +320,7 @@ void ObTestbenchStatisticsCollector::handle(void *task) {
     ObStatisticsTaskType task_type = task_to_handle->get_type();
     if (ObStatisticsTaskType::STATISTICS_QUEUE_TASK == task_type) {
       ObStatisticsQueueTask *queue_task = static_cast<ObStatisticsQueueTask*>(task_to_handle);
-      TIMER("handle queue task", ret = handle_queue_task_(queue_task));
+      ret = handle_queue_task_(queue_task);
     } else if (ObStatisticsTaskType::STATISTICS_SUBMIT_TASK == task_type) {
       ret = handle_submit_task_();
     } else {

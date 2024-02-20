@@ -22,10 +22,10 @@ instance_testbench:
   dataset:
     # for dataset parameteres
     partitions: 9
-    rows: 1000000
+    rows: 10000000
   contention:
-    threads: 5
+    threads: 10
     tasks: 99999
     concurrency: 5
-    operations: 10
+    operations: 1
     aborts: 0

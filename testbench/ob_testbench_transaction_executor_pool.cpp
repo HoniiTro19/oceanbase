@@ -105,13 +105,13 @@ void ObTestbenchTransactionExecutorPool::handle(void *task) {
   } else if (OB_ISNULL(task_to_handle)) {
     ret = OB_ERR_UNEXPECTED;
     TESTBENCH_LOG(ERROR, "transaction task is null", KR(ret));
-  } else if (OB_FAIL(TIMER_RET("transaction task init", task_to_handle->init()))) {
+  } else if (OB_FAIL(task_to_handle->init())) {
     TESTBENCH_LOG(ERROR, "transaction task init failed", KR(ret));
-  } else if (OB_FAIL(TIMER_RET("transaction task execute", task_to_handle->execute_transactions()))) {
+  } else if (OB_FAIL(task_to_handle->execute_transactions())) {
     TESTBENCH_LOG(ERROR, "transaction task execute failed", KR(ret));
-  } else if (OB_FAIL(TIMER_RET("transaction task release", task_to_handle->release_dblinks()))) {
+  } else if (OB_FAIL(task_to_handle->release_dblinks())) {
     TESTBENCH_LOG(ERROR, "transaction task release dblinks failed", KR(ret));
-  } else if (OB_FAIL(TIMER_RET("transaction task collect", task_to_handle->collect_statistics()))) {
+  } else if (OB_FAIL(task_to_handle->collect_statistics())) {
     TESTBENCH_LOG(ERROR, "transaction task collect statistics failed", KR(ret));
   }
   inc_finish_task();

@@ -22,9 +22,9 @@ instance_testbench:
   dataset:
     # for dataset parameteres
     partitions: 9
-    rows: 1000000
+    rows: 10000000
   deadlock:
-    threads: 5
+    threads: 10
     tasks: 99999
-    concurrency: 9
-    chains: 1
+    concurrency: 12
+    chains: 2
