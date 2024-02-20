@@ -488,7 +488,7 @@ class TestBench(object):
         secure_file_sql = 'SET GLOBAL SECURE_FILE_PRIV = ""'
         grant_user_sql = 'GRANT FILE ON *.* TO {}'.format(self._tenant_name)
         set_timeout_sql = 'SET SESSION ob_query_timeout = {}'.format(100 * 1000 * 1000)
-        load_data_sql = 'LOAD DATA /*+ direct(true, 1024) parallel(24) */ INFILE "{}" INTO TABLE {} FIELDS TERMINATED BY ","'.format(self.dataset_manager.dataset_path, self._table_name)
+        load_data_sql = 'LOAD DATA /*+ direct(false, 1024) parallel(24) */ INFILE "{}" INTO TABLE {} FIELDS TERMINATED BY ","'.format(self.dataset_manager.dataset_path, self._table_name)
         partitions = self.dataset_manager.dataset_config["partitions"]
         rows = self.dataset_manager.dataset_config["rows"]
         try:
