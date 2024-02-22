@@ -137,8 +137,8 @@ int ObServerConnectionPool::init(ObMySQLConnectionPool *root,
   if (OB_ISNULL(root)) {
     ret = OB_INVALID_ARGUMENT;
     LOG_WARN("fail to init server connection pool. root=NULL", K(ret));
-  } else if (OB_FAIL(dblink_connection_pool_.init())) {
-    LOG_WARN("fail to init dblink_connection_pool_", K(ret));
+  // } else if (OB_FAIL(dblink_connection_pool_.init())) {
+  //   LOG_WARN("fail to init dblink_connection_pool_", K(ret));
   } else {
     LOG_DEBUG("init server for connection pool", K(server));
     this->root_ = root;
@@ -227,10 +227,10 @@ int ObServerConnectionPool::free_dblink_session(uint32_t sessid)
   int ret = OB_SUCCESS;
   int64_t fail_recycled_conn_count = 0;
   int64_t succ_recycled_conn_count = 0;
-  if (OB_FAIL(dblink_connection_pool_.free_session_conn_array(sessid, fail_recycled_conn_count, succ_recycled_conn_count))) {
-    LOG_WARN("drop dblink session failed, some connection of this seesion will be freed",
-              K(fail_recycled_conn_count), K(succ_recycled_conn_count), K(sessid), K(ret));
-  }
+  // if (OB_FAIL(dblink_connection_pool_.free_session_conn_array(sessid, fail_recycled_conn_count, succ_recycled_conn_count))) {
+  //   LOG_WARN("drop dblink session failed, some connection of this seesion will be freed",
+  //             K(fail_recycled_conn_count), K(succ_recycled_conn_count), K(sessid), K(ret));
+  // }
   LOG_TRACE("free_dblink_session",  KP(this), K(fail_recycled_conn_count), K(succ_recycled_conn_count), K(busy_conn_count_), K(free_conn_count_), K(sessid), K(ret));
   return ret;
 };

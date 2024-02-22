@@ -56,7 +56,7 @@ function distributed_transaction() {
 
         deploy_cluster
 
-        sed -i "s/time:.*/time: 1/" $workload_config
+        sed -i "s/time:.*/time: 5/" $workload_config
         check_cmd_status "update config time"
         time=$(date -u +%FT%T%z)
         trace="distributedtransaction-participants$participant-operations$operation-delay$delay-$time"
@@ -66,7 +66,7 @@ function distributed_transaction() {
         check_cmd_status "run distributed transaction"
         testbench bench resetnet
         check_cmd_status "reset network environment"
-        testbench report histogram -d ~/.testbench/scheduler/$trace/log -f ~/linux-fonts/simsun.ttc -s 60
+        testbench report histogram -d ~/.testbench/scheduler/$trace/log -f ~/linux-fonts/simsun.ttc -s 300
         check_cmd_status "analyze histogram"
 
         destroy_cluster
@@ -91,7 +91,7 @@ function contention_transaction() {
 
         deploy_cluster
 
-        sed -i "s/time:.*/time: 1/" $workload_config
+        sed -i "s/time:.*/time: 5/" $workload_config
         check_cmd_status "update config time"
         time=$(date -u +%FT%T%z)
         trace="contentiontransaction-concurrency$concurrency-operations$operation-delay$delay-$time"
@@ -101,7 +101,7 @@ function contention_transaction() {
         check_cmd_status "run contention transaction"
         testbench bench resetnet
         check_cmd_status "reset network environment"
-        testbench report histogram -d ~/.testbench/scheduler/$trace/log -f ~/linux-fonts/simsun.ttc -s 60
+        testbench report histogram -d ~/.testbench/scheduler/$trace/log -f ~/linux-fonts/simsun.ttc -s 300
         check_cmd_status "analyze histogram"      
 
         destroy_cluster
@@ -126,7 +126,7 @@ function deadlock_transaction() {
 
         deploy_cluster
 
-        sed -i "s/time:.*/time: 1/" $workload_config
+        sed -i "s/time:.*/time: 5/" $workload_config
         check_cmd_status "update config time"
         time=$(date -u +%FT%T%z)
         trace="deadlocktransaction-concurrency$concurrency-chains$chain-delay$delay-$time"
@@ -136,7 +136,7 @@ function deadlock_transaction() {
         check_cmd_status "run deadlock transaction"
         testbench bench resetnet
         check_cmd_status "reset network environment"
-        testbench report histogram -d ~/.testbench/scheduler/$trace/log -f ~/linux-fonts/simsun.ttc -s 60
+        testbench report histogram -d ~/.testbench/scheduler/$trace/log -f ~/linux-fonts/simsun.ttc -s 300
         check_cmd_status "analyze histogram"    
       
         destroy_cluster
@@ -161,7 +161,7 @@ function concurrent_transaction() {
 
         deploy_cluster
 
-        sed -i "s/time:.*/time: 1/" $workload_config
+        sed -i "s/time:.*/time: 5/" $workload_config
         check_cmd_status "update config time"
         time=$(date -u +%FT%T%z)
         trace="concurrenttransaction-operations$operation-readonly$readonly-delay$delay-$time"
@@ -171,7 +171,7 @@ function concurrent_transaction() {
         check_cmd_status "run concurrent transaction"
         testbench bench resetnet
         check_cmd_status "reset network environment"
-        testbench report histogram -d ~/.testbench/scheduler/$trace/log -f ~/linux-fonts/simsun.ttc -s 60
+        testbench report histogram -d ~/.testbench/scheduler/$trace/log -f ~/linux-fonts/simsun.ttc -s 300
         check_cmd_status "analyze histogram"   
       
         destroy_cluster

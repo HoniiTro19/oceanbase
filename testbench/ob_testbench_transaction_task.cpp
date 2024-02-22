@@ -69,7 +69,6 @@ int ObIWorkloadTransactionTask::prepare_arrays()
       latencys_.at(i) = 0;
       cumulative_latencys_.at(i) = 0;
       commits_.at(i) = true;
-      // TODO: get cached connections block for too long
       if (OB_FAIL(mysql_proxy_->get_mysql_conn(dblinks_.at(i), 0, connections_.at(i)))) {
         TESTBENCH_LOG(ERROR, "acquire dblink connection failed", KR(ret), K_(dblinks));
       }
