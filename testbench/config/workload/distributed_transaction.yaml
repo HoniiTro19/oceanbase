@@ -26,5 +26,5 @@ instance_testbench:
   distributed:
     threads: 10
     tasks: 99999
-    participants: 1
+    participants: 3
     operations: 10

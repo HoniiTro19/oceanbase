@@ -106,11 +106,11 @@ void ObTestbenchTransactionScheduler::destroy()
 void ObTestbenchTransactionScheduler::run1() 
 {
   int ret = OB_SUCCESS;
-  int64_t thread_num = executor_pool_->get_thread_num() * 2;
+  int64_t thread_num = executor_pool_->get_thread_num() * 3;
   while (!has_set_stop()) {
     int64_t snap = executor_pool_->load_start_task() - executor_pool_->load_finish_task();
     if (snap < thread_num) {
-      TESTBENCH_LOG(DEBUG, "check transaction executor pool status, need new task", K(snap), K(thread_num));
+      TESTBENCH_LOG(TRACE, "check transaction executor pool status, need new task", K(snap), K(thread_num));
       switch (txn_type_) {
         case DISTRIBUTED_TRANSACTION:
           generate_distributed_txn_task();

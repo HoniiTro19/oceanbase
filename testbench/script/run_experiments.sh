@@ -41,7 +41,7 @@ function destroy_cluster() {
 }
 
 function distributed_transaction() {
-  delays=(1 20 50 100)
+  delays=(1 20 50)
   participants=(1 2 3)
   operations=(10 20 30 40 50 60)
   workload_config="$CONFIG/workload/distributed_transaction.yaml"
@@ -60,17 +60,13 @@ function distributed_transaction() {
         check_cmd_status "update config time"
         time=$(date -u +%FT%T%z)
         trace="distributedtransaction-participants$participant-operations$operation-delay$delay-$time"
-        testbench bench test -c $workload_config -t "$trace-warmup"
-        check_cmd_status "distributed transaction warmup"
-        sed -i "s/time:.*/time: 5/" $workload_config
-        check_cmd_status "update config time"
         testbench bench mocknet -c $cluster_config -d $delay -l 0
         check_cmd_status "simulate network environment"
         testbench bench test -c $workload_config -t $trace
         check_cmd_status "run distributed transaction"
         testbench bench resetnet
         check_cmd_status "reset network environment"
-        testbench report histogram -d ~/.testbench/scheduler/$trace/log -f ~/linux-fonts/simsun.ttc -s 300
+        testbench report histogram -d ~/.testbench/scheduler/$trace/log -f ~/linux-fonts/simsun.ttc -s 60
         check_cmd_status "analyze histogram"
 
         destroy_cluster
@@ -80,9 +76,9 @@ function distributed_transaction() {
 }
 
 function contention_transaction() {
-  delays=(1 20 50 100)
+  delays=(1 20 50)
   concurrencys=(5 10 15 20)
-  operations=(1 5 10 15 20)
+  operations=(1 10 20 30 40)
   workload_config="$CONFIG/workload/contention_transaction.yaml"
   check_file_exists $workload_config
   for delay in ${delays[@]}; do
@@ -99,17 +95,13 @@ function contention_transaction() {
         check_cmd_status "update config time"
         time=$(date -u +%FT%T%z)
         trace="contentiontransaction-concurrency$concurrency-operations$operation-delay$delay-$time"
-        testbench bench test -c $workload_config -t "$trace-warmup" -e
-        check_cmd_status "contention transaction warmup"
-        sed -i "s/time:.*/time: 5/" $workload_config
-        check_cmd_status "update config time"
         testbench bench mocknet -c $cluster_config -d $delay -l 0
         check_cmd_status "simulate network environment"
         testbench bench test -c $workload_config -t $trace -e
         check_cmd_status "run contention transaction"
         testbench bench resetnet
         check_cmd_status "reset network environment"
-        testbench report histogram -d ~/.testbench/scheduler/$trace/log -f ~/linux-fonts/simsun.ttc -s 300
+        testbench report histogram -d ~/.testbench/scheduler/$trace/log -f ~/linux-fonts/simsun.ttc -s 60
         check_cmd_status "analyze histogram"      
 
         destroy_cluster
@@ -119,7 +111,7 @@ function contention_transaction() {
 }
 
 function deadlock_transaction() {
-  delays=(1 20 50 100)
+  delays=(1 20 50)
   concurrencys=(6 12 18 24 30)
   chains=(1 2 3)
   workload_config="$CONFIG/workload/deadlock_transaction.yaml"
@@ -138,17 +130,13 @@ function deadlock_transaction() {
         check_cmd_status "update config time"
         time=$(date -u +%FT%T%z)
         trace="deadlocktransaction-concurrency$concurrency-chains$chain-delay$delay-$time"
-        testbench bench test -c $workload_config -t "$trace-warmup" -l
-        check_cmd_status "deadlock transaction warmup"
-        sed -i "s/time:.*/time: 5/" $workload_config
-        check_cmd_status "update config time"
         testbench bench mocknet -c $cluster_config -d $delay -l 0
         check_cmd_status "simulate network environment"
         testbench bench test -c $workload_config -t $trace -l
         check_cmd_status "run deadlock transaction"
         testbench bench resetnet
         check_cmd_status "reset network environment"
-        testbench report histogram -d ~/.testbench/scheduler/$trace/log -f ~/linux-fonts/simsun.ttc -s 300
+        testbench report histogram -d ~/.testbench/scheduler/$trace/log -f ~/linux-fonts/simsun.ttc -s 60
         check_cmd_status "analyze histogram"    
       
         destroy_cluster
@@ -158,7 +146,7 @@ function deadlock_transaction() {
 }
 
 function concurrent_transaction() {
-  delays=(1 20 50 100)
+  delays=(1 20 50)
   operations=(0 10 20 30)
   readonlys=(0 20 40 60 80 100)
   workload_config="$CONFIG/workload/concurrent_transaction.yaml"
@@ -177,17 +165,13 @@ function concurrent_transaction() {
         check_cmd_status "update config time"
         time=$(date -u +%FT%T%z)
         trace="concurrenttransaction-operations$operation-readonly$readonly-delay$delay-$time"
-        testbench bench test -c $workload_config -t "$trace-warmup"
-        check_cmd_status "concurrent transaction warmup"
-        sed -i "s/time:.*/time: 5/" $workload_config
-        check_cmd_status "update config time"
         testbench bench mocknet -c $cluster_config -d $delay -l 0
         check_cmd_status "simulate network environment"
         testbench bench test -c $workload_config -t $trace
         check_cmd_status "run concurrent transaction"
         testbench bench resetnet
         check_cmd_status "reset network environment"
-        testbench report histogram -d ~/.testbench/scheduler/$trace/log -f ~/linux-fonts/simsun.ttc -s 300
+        testbench report histogram -d ~/.testbench/scheduler/$trace/log -f ~/linux-fonts/simsun.ttc -s 60
         check_cmd_status "analyze histogram"   
       
         destroy_cluster

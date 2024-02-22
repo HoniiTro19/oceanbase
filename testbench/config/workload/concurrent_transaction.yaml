@@ -27,5 +27,5 @@ instance_testbench:
     threads: 10
     tasks: 99999
     concurrency: 6
-    operations: 10
-    readonly: 0
+    operations: 20
+    readonly: 100

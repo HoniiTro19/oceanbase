@@ -3,10 +3,10 @@ instance_testbench:
   global:
     # common parameters
     log_level: INFO
-    time: 1
+    time: 5
   statistics:
     # for statistics collector
-    capacity: 500
+    capacity: 1000
     minimum: 10
     maximum: 50
     threads: 1
@@ -26,6 +26,6 @@ instance_testbench:
   contention:
     threads: 10
     tasks: 99999
-    concurrency: 5
-    operations: 1
+    concurrency: 20
+    operations: 20
     aborts: 0

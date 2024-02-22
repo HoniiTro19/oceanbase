@@ -54,6 +54,9 @@ TEST_F(TestTestbenchLocationCache, generate_parameters) {
   ASSERT_NE(OB_SUCCESS, location_cache.gen_distributed_txn_params(1000, parameters, dblinks));
   for (int64_t i = 0; i < times; ++i) {
     // distributed transaction
+    ASSERT_EQ(OB_SUCCESS, location_cache.gen_distributed_txn_params(1, parameters, dblinks));
+    ASSERT_EQ(1, parameters.count());
+    ASSERT_EQ(1, dblinks.count());
     ASSERT_EQ(OB_SUCCESS, location_cache.gen_distributed_txn_params(2, parameters, dblinks));
     ASSERT_EQ(2, parameters.count());
     ASSERT_EQ(2, dblinks.count());

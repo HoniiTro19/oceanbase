@@ -69,6 +69,7 @@ int ObIWorkloadTransactionTask::prepare_arrays()
       latencys_.at(i) = 0;
       cumulative_latencys_.at(i) = 0;
       commits_.at(i) = true;
+      // TODO: get cached connections block for too long
       if (OB_FAIL(mysql_proxy_->get_mysql_conn(dblinks_.at(i), 0, connections_.at(i)))) {
         TESTBENCH_LOG(ERROR, "acquire dblink connection failed", KR(ret), K_(dblinks));
       }
@@ -308,7 +309,7 @@ int ObDistributedTransactionTask::execute_transactions()
   // begin transaction
   if (FALSE_IT(begin_trace_latency(cumulative_latencys_.at(conn_idx)))) {
     // impossible
-  } else if (OB_FAIL(connections_.at(conn_idx)->start_transaction_async())) {
+  } else if (OB_FAIL(connections_.at(conn_idx)->start_transaction_async(true))) {
     TESTBENCH_LOG(WARN, "start transaction async failed", KR(ret));
     return ret;
   }
@@ -843,7 +844,7 @@ int ObConcurrentTransactionTask::execute_transactions()
   // begin transactions
   for (int64_t conn_idx = 0; conn_idx < connection_count_; ++conn_idx) {
     begin_trace_latency(cumulative_latencys_.at(conn_idx));
-    if (OB_FAIL(connections_.at(conn_idx)->start_transaction_async())) {
+    if (OB_FAIL(connections_.at(conn_idx)->start_transaction_async(true))) {
       TESTBENCH_LOG(WARN, "start transaction async failed", KR(ret));
       return ret;
     }
