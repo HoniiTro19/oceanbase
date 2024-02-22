@@ -5,8 +5,8 @@ instance_observer:
     # please set memory limit to a suitable value which is matching resource. 
     memory_limit: 32G # The maximum running memory for an observer
     system_memory: 15G # The reserved system memory. system_memory is reserved for general tenants. The default value is 30G.
-    datafile_size: 32G # Size of the data file. 
-    log_disk_size: 32G # The size of disk space used by the clog files.
+    datafile_size: 25G # Size of the data file. 
+    log_disk_size: 25G # The size of disk space used by the clog files.
     cpu_count: 8
     production_mode: false
     syslog_level: INFO # System log level. The default value is INFO.

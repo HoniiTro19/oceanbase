@@ -23,6 +23,7 @@ from stdio import IO
 
 import os
 import sys
+import time
 import textwrap
 from uuid import uuid1 as uuid
 from optparse import OptionParser, BadOptionError, Option, IndentedHelpFormatter
@@ -212,6 +213,7 @@ class TestBenchCommand(BaseCommand):
         super(TestBenchCommand, self).parse_command()
 
     def do_command(self):
+        starttime = time.time()
         self.parse_command()
         self.init_home()
         traceid = getattr(self.opts, "traceid", "")
@@ -237,7 +239,10 @@ class TestBenchCommand(BaseCommand):
         except:
             e = sys.exc_info()[1]
             ROOT_IO.exception("Running Error: %s" % e)
+        endtime = time.time()
+        runtime = endtime - starttime
         ROOT_IO.print("Trace ID: %s" % traceid)
+        ROOT_IO.print("Run Time: %f" % runtime)
         return ret
 
     def _do_command(self, tb):
@@ -374,7 +379,7 @@ class BenchMajorCommand(MajorCommand):
         self.register_command(BenchLoadCommand())
         self.register_command(BenchTestCommand())
         self.register_command(BenchMocknetCommand())
-
+        self.register_command(BenchResetnetCommand())
 
 class BenchDataCommand(TestBenchCommand):
     def __init__(self):
@@ -510,8 +515,16 @@ class BenchMocknetCommand(TestBenchCommand):
     def _do_command(self, tb):
         self._do_step("Checking options.", self._check)
         self._do_step("Simulating network environment.", tb.enable_mocknet)
+
+class BenchResetnetCommand(TestBenchCommand):
+    def __init__(self):
+        super(BenchResetnetCommand, self).__init__(
+            "resetnet", "Reset the network environment among database instance."
+        )
+    
+    def _do_command(self, tb):
         self._do_step("Reseting network environment.", tb.disable_mocknet)
-        
+
 class ReportMajorCommand(MajorCommand):
     def __init__(self):
         super(ReportMajorCommand, self).__init__(

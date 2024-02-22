@@ -115,7 +115,8 @@ void ObTestbenchTransactionExecutorPool::handle(void *task) {
     TESTBENCH_LOG(ERROR, "transaction task collect statistics failed", KR(ret));
   }
   inc_finish_task();
-  allocator_.free(task_to_handle);
+  // allocator_.free(task_to_handle);
+  delete task_to_handle;
 }
 
 int ObTestbenchTransactionExecutorPool::push_task(ObIWorkloadTransactionTask *task) {

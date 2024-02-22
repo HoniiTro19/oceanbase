@@ -32,11 +32,11 @@ ObIWorkloadTransactionTask::ObIWorkloadTransactionTask(BasicTaskConfig config)
 
 ObIWorkloadTransactionTask::~ObIWorkloadTransactionTask() 
 {
-  latencys_.release_array();
-  cumulative_latencys_.release_array();
-  commits_.release_array();
-  connections_.release_array();
-  pollfds_.release_array();
+  latencys_.release_array(allocator_);
+  cumulative_latencys_.release_array(allocator_);
+  commits_.release_array(allocator_);
+  connections_.release_array(allocator_);
+  pollfds_.release_array(allocator_);
 }
 
 void ObIWorkloadTransactionTask::begin_trace_latency(int64_t &latency) 
@@ -193,14 +193,20 @@ int ObIWorkloadTransactionTask::find_mysql_ready(int64_t &conn_idx)
 int ObIWorkloadTransactionTask::record_latency(ObLatencyTaskType type, int64_t latency) 
 {
   int ret = OB_SUCCESS;
+  if (latency == 0) {
+    return ret;
+  }
   ObLatencyTask *task = nullptr;
-  void *buf = nullptr;
   common::ObObj latency_obj;
   latency_obj.set_int(latency);
-  if (OB_ISNULL(buf = allocator_.alloc(sizeof(ObLatencyTask)))) {
-    ret = OB_ALLOCATE_MEMORY_FAILED;
-    TESTBENCH_LOG(ERROR, "allocate memory failed", KR(ret));
-  } else if (OB_ISNULL(task = new(buf)ObLatencyTask(type, latency_obj))) {
+  // TODO: use the right allocator
+  // void *buf = nullptr;
+  // if (OB_ISNULL(buf = allocator_.alloc(sizeof(ObLatencyTask)))) {
+  //   ret = OB_ALLOCATE_MEMORY_FAILED;
+  //   TESTBENCH_LOG(ERROR, "allocate memory failed", KR(ret));
+  // } else if (OB_ISNULL(task = new(buf)ObLatencyTask(type, latency_obj))) {
+  //   TESTBENCH_LOG(ERROR, "create new latency task failed", KR(ret), K(type));
+  if (OB_ISNULL(task = new ObLatencyTask(type, latency_obj))) {
     TESTBENCH_LOG(ERROR, "create new latency task failed", KR(ret), K(type));
   } else if (OB_FAIL(latency_collector_->push_latency_task(task))) {
     TESTBENCH_LOG(ERROR, "push latency task failed", KR(ret), K(latency_obj));
@@ -254,7 +260,7 @@ ObDistributedTransactionTask::ObDistributedTransactionTask(BasicTaskConfig basic
 
 ObDistributedTransactionTask::~ObDistributedTransactionTask() 
 {
-  lock_dist_stmts_.release_array();
+  lock_dist_stmts_.release_array(allocator_);
 }
 
 int ObDistributedTransactionTask::release_dblinks() 
@@ -267,6 +273,7 @@ int ObDistributedTransactionTask::release_dblinks()
       TESTBENCH_LOG(ERROR, "release dblink failed", KR(ret));
     }
   }
+  lock_dist_stmts_.release_array(allocator_);
   return ret;
 }
 
@@ -301,7 +308,7 @@ int ObDistributedTransactionTask::execute_transactions()
   // begin transaction
   if (FALSE_IT(begin_trace_latency(cumulative_latencys_.at(conn_idx)))) {
     // impossible
-  } else if (OB_FAIL(connections_.at(conn_idx)->start_transaction_async())) {
+  } else if (OB_FAIL(connections_.at(conn_idx)->start_transaction_async(true))) {
     TESTBENCH_LOG(WARN, "start transaction async failed", KR(ret));
     return ret;
   }
@@ -376,8 +383,8 @@ ObContentionTransactionTask::ObContentionTransactionTask(BasicTaskConfig basic_c
 
 ObContentionTransactionTask::~ObContentionTransactionTask() 
 {
-  lock_contention_stmts_.release_array();
-  act_operations_.release_array();
+  lock_contention_stmts_.release_array(allocator_);
+  act_operations_.release_array(allocator_);
 }
 
 int ObContentionTransactionTask::init() 
@@ -429,12 +436,12 @@ int ObContentionTransactionTask::execute_transactions()
   int64_t conn_idx = 0;
   while (finished_ < connection_count_) {
     if (OB_FAIL(find_connection_ready_multiplexing(conn_idx))) {
-      if (ret != OB_NEED_RETRY) {
-        commits_.at(conn_idx) = false;
-        TESTBENCH_LOG(WARN, "find connection ready failed", KR(ret));
-      } else if (ret == OB_TIMEOUT) {
+      if (ret == OB_TIMEOUT) {
         TESTBENCH_LOG(WARN, "operations timeout", KR(ret));
         return ret;
+      } else if (ret != OB_NEED_RETRY) {
+        commits_.at(conn_idx) = false;
+        TESTBENCH_LOG(WARN, "find connection ready failed", KR(ret), K(conn_idx));
       }
     }
     if (OB_FAIL(push_forward_operations(conn_idx, current_row_id))) {
@@ -493,13 +500,13 @@ int ObContentionTransactionTask::push_forward_operations(int64_t conn_idx, int64
       int64_t contention_row_id = row_id_start_;
       ObMySQLPreparedStatement &stmt = lock_contention_stmts_.at(conn_idx);
       ObMySQLConnection *conn = connections_.at(conn_idx);
+      begin_trace_latency(latencys_.at(conn_idx));
       if (OB_FAIL(bind_params(parameters_.at(contention_partition_id), contention_row_id, stmt))) {
         TESTBENCH_LOG(WARN, "bind parameters for statement failed", KR(ret), "partition", parameters_.at(contention_partition_id), "row", contention_row_id);
-      } else if (FALSE_IT(begin_trace_latency(latencys_.at(conn_idx)))) {
-        // impossible
       } else if (OB_FAIL(connections_.at(conn_idx)->execute_write_async(stmt))) {
         TESTBENCH_LOG(WARN, "execute write async failed", KR(ret));
       }
+      TESTBENCH_LOG(TRACE, "execute contention row", K(conn_idx), K_(act_operations));
       ++act_operations_.at(conn_idx);
       if (OB_FAIL(ret)) {
         commits_.at(conn_idx) = false;
@@ -515,12 +522,16 @@ int ObContentionTransactionTask::push_forward_operations(int64_t conn_idx, int64
       } else if (OB_FAIL(connections_.at(conn_idx)->execute_write_async(stmt))) {
         TESTBENCH_LOG(WARN, "execute write async failed", KR(ret));
       }
+      TESTBENCH_LOG(TRACE, "execute non-contention row", K(conn_idx), K(current_row_id), K_(act_operations), K_(latencys), K_(cumulative_latencys));
       current_row_id += 1;
       ++act_operations_.at(conn_idx);
       if (OB_FAIL(ret)) {
         commits_.at(conn_idx) = false;
       }
     } else if (act_operations_.at(conn_idx) == operations_) {
+      if (act_operations_.at(conn_idx) == 1) {
+        end_trace_latency(latencys_.at(conn_idx));
+      }
       // commit or abort transactions
       int64_t commits = connection_count_ - aborts_;
       bool commit = commits_.at(conn_idx) && act_commits_ < commits;
@@ -530,11 +541,13 @@ int ObContentionTransactionTask::push_forward_operations(int64_t conn_idx, int64
           TESTBENCH_LOG(WARN, "execute commit transaction async failed", KR(ret));
         }
         ++act_commits_;
+        TESTBENCH_LOG(TRACE, "execute contention transaction commit", K(conn_idx), K_(act_operations), K_(act_commits));
       } else {
         if (OB_FAIL(connections_.at(conn_idx)->rollback_async())) {
           TESTBENCH_LOG(WARN, "execute rollback transaction async failed", KR(ret));
         }
         commits_.at(conn_idx) = false;
+        TESTBENCH_LOG(TRACE, "execute contention transaction abort", K(conn_idx), K_(act_operations), K_(act_commits));
       }
       ++act_operations_.at(conn_idx);
       if (OB_FAIL(ret)) {
@@ -561,8 +574,8 @@ ObDeadlockTransactionTask::ObDeadlockTransactionTask(BasicTaskConfig basic_confi
 
 ObDeadlockTransactionTask::~ObDeadlockTransactionTask() 
 {
-  lock_deadlock_stmts_.release_array();
-  lock_multi_deadlock_stmts_.release_array();
+  lock_deadlock_stmts_.release_array(allocator_);
+  lock_multi_deadlock_stmts_.release_array(allocator_);
 }
 
 int ObDeadlockTransactionTask::init() {
@@ -649,6 +662,7 @@ int ObDeadlockTransactionTask::execute_transactions()
   // execute anti-dependency row
   current_row_id = row_id_start_ + 1;
   int64_t anti_dependency_row_id = 0;
+  int64_t cycle_idx = 0;
   for (int64_t conn_idx = 0; conn_idx < connection_count_; ++conn_idx) {
     ObMySQLPreparedStatement &stmt = lock_deadlock_stmts_.at(conn_idx);
     ObMySQLPreparedStatement &multi_stmt = lock_multi_deadlock_stmts_.at(conn_idx);
@@ -659,10 +673,10 @@ int ObDeadlockTransactionTask::execute_transactions()
       anti_dependency_row_id = row_id_start_ + anti_dependency_idx;
       if (OB_FAIL(wait_for_connection_block(conn_idx))) {
         TESTBENCH_LOG(WARN, "wait for connection block failed", KR(ret));
+      } else if (FALSE_IT(begin_trace_latency(latencys_.at(cycle_idx++)))) {
+        // impossible
       } else if (OB_FAIL(bind_params(parameters_.at(anti_dependency_idx), anti_dependency_row_id, stmt))) {
         TESTBENCH_LOG(WARN, "bind parameters for statement failed", KR(ret), "partition", parameters_.at(anti_dependency_idx), "row", anti_dependency_row_id);
-      } else if (FALSE_IT(begin_trace_latency(latencys_.at(conn_idx)))) {
-        // impossible
       } else if (OB_FAIL(connections_.at(conn_idx)->execute_write_async(stmt))) {
         TESTBENCH_LOG(WARN, "execute write async failed", KR(ret));
       } else {
@@ -673,31 +687,36 @@ int ObDeadlockTransactionTask::execute_transactions()
       anti_dependency_row_id = row_id_start_ + anti_dependency_idx;
       if (OB_FAIL(wait_for_connection_block(conn_idx))) {
         TESTBENCH_LOG(WARN, "wait for connection block failed", KR(ret));
+      } else if (FALSE_IT(begin_trace_latency(latencys_.at(cycle_idx++)))) {
+        // impossible
       } else if (OB_FAIL(bind_multi_params(parameters_.at(conn_idx + 1), current_row_id, parameters_.at(anti_dependency_idx), anti_dependency_row_id, multi_stmt))) {
         TESTBENCH_LOG(WARN, "bind multiple parameters failed", KR(ret));
-      } else if (FALSE_IT(begin_trace_latency(latencys_.at(conn_idx)))) {
-        // impossible
       } else if (OB_FAIL(connections_.at(conn_idx)->execute_write_async(multi_stmt))) {
         TESTBENCH_LOG(WARN, "execute write async failed", KR(ret));
       } else {
         TESTBENCH_LOG(TRACE, "execute anti-dependency row", "partition0", parameters_.at(conn_idx + 1), "row0", current_row_id, "partition1", parameters_.at(anti_dependency_idx), "row1", anti_dependency_row_id);
       }
+      ++current_row_id;
     }
-    ++current_row_id;
     if (OB_FAIL(ret)) {
       commits_.at(conn_idx) = false;
     }
   }
   // commit or rollback transactions to release locks
   int64_t conn_idx = 0;
+  cycle_idx = 0;
   while (finished_ < connection_count_) {
     if (OB_FAIL(find_connection_ready_multiplexing(conn_idx))) {
-      commits_.at(conn_idx) = false;
-      if (ret != OB_NEED_RETRY) {
-        TESTBENCH_LOG(WARN, "find connection ready failed", KR(ret));
-      } else if (ret == OB_TIMEOUT) {
+      if (ret == OB_TIMEOUT) {
         TESTBENCH_LOG(WARN, "operations timeout", KR(ret));
         return ret;
+      } else if (ret == OB_DEADLOCK) {
+        commits_.at(conn_idx) = false;
+        TESTBENCH_LOG(INFO, "deadlock cycle detected", K(ret), K(cycle_idx));
+        end_trace_latency(latencys_.at(cycle_idx++));
+      } else if (ret != OB_NEED_RETRY) {
+        commits_.at(conn_idx) = false;
+        TESTBENCH_LOG(WARN, "find connection ready failed", KR(ret), K(conn_idx));
       }
     }
     if (OB_FAIL(push_forward_operations(conn_idx))) {
@@ -726,12 +745,12 @@ int ObDeadlockTransactionTask::collect_statistics()
 {
   int ret = OB_SUCCESS;
   for (int64_t conn_idx = 0; conn_idx < connection_count_; ++conn_idx) {
-    if (false == commits_.at(conn_idx)) {
+    if (OB_FAIL(record_latency(ObLatencyTaskType::DEADLOCK_SQL_LATENCY_TASK, latencys_.at(conn_idx)))) {
+      TESTBENCH_LOG(WARN, "record the latency of cycle detection and resolution failed", KR(ret), "latency", latencys_.at(conn_idx));
+    } else if (false == commits_.at(conn_idx)) {
       if (OB_FAIL(record_latency(ObLatencyTaskType::ROLLBACK_TXN_LATENCY_TASK, cumulative_latencys_.at(conn_idx)))) {
         TESTBENCH_LOG(WARN, "record the latency of rollback transaction failed", KR(ret), "txn_latency", cumulative_latencys_.at(conn_idx));
       }
-    } else if (conn_idx % cycle_ == cycle_ - 1 && OB_FAIL(record_latency(ObLatencyTaskType::DEADLOCK_SQL_LATENCY_TASK, latencys_.at(conn_idx)))) {
-      TESTBENCH_LOG(WARN, "record the latency of cycle detection and resolution failed", KR(ret), "latency", latencys_.at(conn_idx));
     } else if (OB_FAIL(record_latency(ObLatencyTaskType::DEADLOCK_TXN_LATENCY_TASK, cumulative_latencys_.at(conn_idx)))) {
       TESTBENCH_LOG(WARN, "record the latency of deadlock transaction failed", KR(ret), "txn_latency", cumulative_latencys_.at(conn_idx));
     } else {
@@ -755,8 +774,6 @@ int ObDeadlockTransactionTask::push_forward_operations(int64_t conn_idx)
       if (OB_FAIL(commits_.at(conn_idx) ? connections_.at(conn_idx)->commit_async() : connections_.at(conn_idx)->rollback_async())) {
         commits_.at(conn_idx) = false;
         TESTBENCH_LOG(WARN, "execute rollback async failed", KR(ret), "is_commit", commits_.at(conn_idx));
-      } else if (conn_idx % cycle_ == cycle_ - 1) {
-        end_trace_latency(latencys_.at(conn_idx));
       }
       act_commits_.at(conn_idx) = true;
     } else {
@@ -780,10 +797,10 @@ ObConcurrentTransactionTask::ObConcurrentTransactionTask(BasicTaskConfig basic_c
 
 ObConcurrentTransactionTask::~ObConcurrentTransactionTask() 
 {
-  lock_wrtxn_stmts_.release_array();
-  lock_rdtxn_stmts_.release_array();
-  wait_for_reads_.release_array();
-  act_operations_.release_array();
+  lock_wrtxn_stmts_.release_array(allocator_);
+  lock_rdtxn_stmts_.release_array(allocator_);
+  wait_for_reads_.release_array(allocator_);
+  act_operations_.release_array(allocator_);
 }
 
 int ObConcurrentTransactionTask::init() {
@@ -826,7 +843,7 @@ int ObConcurrentTransactionTask::execute_transactions()
   // begin transactions
   for (int64_t conn_idx = 0; conn_idx < connection_count_; ++conn_idx) {
     begin_trace_latency(cumulative_latencys_.at(conn_idx));
-    if (OB_FAIL(connections_.at(conn_idx)->start_transaction_async())) {
+    if (OB_FAIL(connections_.at(conn_idx)->start_transaction_async(true))) {
       TESTBENCH_LOG(WARN, "start transaction async failed", KR(ret));
       return ret;
     }
@@ -843,10 +860,13 @@ int ObConcurrentTransactionTask::execute_transactions()
   int64_t conn_idx = 0;
   while (finished_ < connection_count_) {
     if (OB_FAIL(find_connection_ready_multiplexing(conn_idx))) {
-      if (ret != OB_NEED_RETRY) {
+      if (ret == OB_TIMEOUT) {
+        TESTBENCH_LOG(WARN, "operations timeout", KR(ret));
+        return ret;
+      } else if (ret != OB_NEED_RETRY) {
         commits_.at(conn_idx) = false;
-        TESTBENCH_LOG(WARN, "find connection ready failed", KR(ret), K_(finished), K_(act_operations));
-      }
+        TESTBENCH_LOG(WARN, "find connection ready failed", KR(ret), K(conn_idx), K_(finished), K_(act_operations));
+      } 
     }
     if (OB_FAIL(push_forward_operations(conn_idx, current_row_id))) {
       TESTBENCH_LOG(WARN, "push forward transaction operations failed", KR(ret));

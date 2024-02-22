@@ -64,7 +64,8 @@ public:
   int free_dblink_session(uint32_t sessid) override;
 private:
   ObSimpleConnectionAllocator<ObMySQLConnection> connection_pool_;
-  ObLruConnectionAllocator<ObMySQLConnection> dblink_connection_pool_;
+  // ObLruConnectionAllocator<ObMySQLConnection> dblink_connection_pool_;
+  ObSimpleConnectionAllocator<ObMySQLConnection> dblink_connection_pool_;
   ObIConnectionAllocator<ObMySQLConnection> *connection_pool_ptr_;
   ObMySQLConnectionPool *root_;
   uint64_t dblink_id_;

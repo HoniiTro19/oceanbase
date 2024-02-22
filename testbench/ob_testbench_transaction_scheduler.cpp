@@ -106,11 +106,11 @@ void ObTestbenchTransactionScheduler::destroy()
 void ObTestbenchTransactionScheduler::run1() 
 {
   int ret = OB_SUCCESS;
-  int64_t thread_num = executor_pool_->get_thread_num() * 2;
+  int64_t thread_num = executor_pool_->get_thread_num() * 3;
   while (!has_set_stop()) {
     int64_t snap = executor_pool_->load_start_task() - executor_pool_->load_finish_task();
     if (snap < thread_num) {
-      TESTBENCH_LOG(DEBUG, "check transaction executor pool status, need new task", K(snap), K(thread_num));
+      TESTBENCH_LOG(TRACE, "check transaction executor pool status, need new task", K(snap), K(thread_num));
       switch (txn_type_) {
         case DISTRIBUTED_TRANSACTION:
           generate_distributed_txn_task();
@@ -150,11 +150,15 @@ int ObTestbenchTransactionScheduler::generate_distributed_txn_task()
       ObDistributedTransactionTask *task = nullptr;
       BasicTaskConfig config{ table_name_, concurrency, statistics_collector_, mysql_proxy_, parameters, dblinks, cur_row_id_ };
       cur_row_id_ = (cur_row_id_ + operations * concurrency) % dataset_options_->get_rows();
-      void *buf = nullptr;
-      if (OB_ISNULL(buf = allocator_.alloc(sizeof(ObDistributedTransactionTask)))) {
-        ret = OB_ALLOCATE_MEMORY_FAILED;
-        TESTBENCH_LOG(ERROR, "allocate memory failed", KR(ret));
-      } else if (OB_ISNULL(task = new(buf)ObDistributedTransactionTask(config, partitions, operations))) {
+      // TODO: use the right allocator
+      // void *buf = nullptr;
+      // if (OB_ISNULL(buf = allocator_.alloc(sizeof(ObDistributedTransactionTask)))) {
+      //   ret = OB_ALLOCATE_MEMORY_FAILED;
+      //   TESTBENCH_LOG(ERROR, "allocate memory failed", KR(ret));
+      // } else if (OB_ISNULL(task = new(buf)ObDistributedTransactionTask(config, partitions, operations))) {
+      //   ret = OB_ERR_UNEXPECTED;
+      //   TESTBENCH_LOG(ERROR, "create new distributed transaction task failed", KR(ret));
+      if (OB_ISNULL(task = new ObDistributedTransactionTask(config, partitions, operations))) {
         ret = OB_ERR_UNEXPECTED;
         TESTBENCH_LOG(ERROR, "create new distributed transaction task failed", KR(ret));
       } else if (OB_FAIL(executor_pool_->push_task(task))) {
@@ -184,11 +188,14 @@ int ObTestbenchTransactionScheduler::generate_contention_txn_task()
       ObContentionTransactionTask *task = nullptr;
       BasicTaskConfig config{ table_name_, concurrency, statistics_collector_, mysql_proxy_, parameters, dblinks, cur_row_id_ };
       cur_row_id_ = (cur_row_id_ + concurrency * operations) % dataset_options_->get_rows();
-      void *buf = nullptr;
-      if (OB_ISNULL(buf = allocator_.alloc(sizeof(ObContentionTransactionTask)))) {
-        ret = OB_ALLOCATE_MEMORY_FAILED;
-        TESTBENCH_LOG(ERROR, "allocate memory failed", KR(ret));
-      } else if (OB_ISNULL(task = new(buf)ObContentionTransactionTask(config, aborts, operations))) {
+      // void *buf = nullptr;
+      // if (OB_ISNULL(buf = allocator_.alloc(sizeof(ObContentionTransactionTask)))) {
+      //   ret = OB_ALLOCATE_MEMORY_FAILED;
+      //   TESTBENCH_LOG(ERROR, "allocate memory failed", KR(ret));
+      // } else if (OB_ISNULL(task = new(buf)ObContentionTransactionTask(config, aborts, operations))) {
+      //   ret = OB_ERR_UNEXPECTED;
+      //   TESTBENCH_LOG(ERROR, "create new contention transaction task failed", KR(ret));
+      if (OB_ISNULL(task = new ObContentionTransactionTask(config, aborts, operations))) {
         ret = OB_ERR_UNEXPECTED;
         TESTBENCH_LOG(ERROR, "create new contention transaction task failed", KR(ret));
       } else if (OB_FAIL(executor_pool_->push_task(task))) {
@@ -217,11 +224,14 @@ int ObTestbenchTransactionScheduler::generate_deadlock_txn_task()
       ObDeadlockTransactionTask *task = nullptr;
       BasicTaskConfig config{ table_name_, concurrency, statistics_collector_, mysql_proxy_, parameters, dblinks, cur_row_id_ };
       cur_row_id_ = (cur_row_id_ + concurrency * chains) % dataset_options_->get_rows();
-      void *buf = nullptr;
-      if (OB_ISNULL(buf = allocator_.alloc(sizeof(ObDeadlockTransactionTask)))) {
-        ret = OB_ALLOCATE_MEMORY_FAILED;
-        TESTBENCH_LOG(ERROR, "allocate memory failed", KR(ret));
-      } else if (OB_ISNULL(task = new(buf)ObDeadlockTransactionTask(config, chains))) {
+      // void *buf = nullptr;
+      // if (OB_ISNULL(buf = allocator_.alloc(sizeof(ObDeadlockTransactionTask)))) {
+      //   ret = OB_ALLOCATE_MEMORY_FAILED;
+      //   TESTBENCH_LOG(ERROR, "allocate memory failed", KR(ret));
+      // } else if (OB_ISNULL(task = new(buf)ObDeadlockTransactionTask(config, chains))) {
+      //   ret = OB_ERR_UNEXPECTED;
+      //   TESTBENCH_LOG(ERROR, "create new deadlock transaction task failed", KR(ret));
+      if (OB_ISNULL(task = new ObDeadlockTransactionTask(config, chains))) {
         ret = OB_ERR_UNEXPECTED;
         TESTBENCH_LOG(ERROR, "create new deadlock transaction task failed", KR(ret));
       } else if (OB_FAIL(executor_pool_->push_task(task))) {
@@ -257,11 +267,14 @@ int ObTestbenchTransactionScheduler::generate_concurrent_txn_task()
       }
       BasicTaskConfig config{ table_name_, concurrency, statistics_collector_, mysql_proxy_, parameters, dblinks, cur_row_id_ };
       cur_row_id_ = (cur_row_id_ + concurrency * operations) % dataset_options_->get_rows();
-      void *buf = nullptr;
-      if (OB_ISNULL(buf = allocator_.alloc(sizeof(ObConcurrentTransactionTask)))) {
-        ret = OB_ALLOCATE_MEMORY_FAILED;
-        TESTBENCH_LOG(ERROR, "allocate memory failed", KR(ret));
-      } else if (OB_ISNULL(task = new(buf)ObConcurrentTransactionTask(config, operations, readonlys))) {
+      // void *buf = nullptr;
+      // if (OB_ISNULL(buf = allocator_.alloc(sizeof(ObConcurrentTransactionTask)))) {
+      //   ret = OB_ALLOCATE_MEMORY_FAILED;
+      //   TESTBENCH_LOG(ERROR, "allocate memory failed", KR(ret));
+      // } else if (OB_ISNULL(task = new(buf)ObConcurrentTransactionTask(config, operations, readonlys))) {
+      //   ret = OB_ERR_UNEXPECTED;
+      //   TESTBENCH_LOG(ERROR, "create new concurrent transaction task failed", KR(ret));
+      if (OB_ISNULL(task = new ObConcurrentTransactionTask(config, operations, readonlys))) {
         ret = OB_ERR_UNEXPECTED;
         TESTBENCH_LOG(ERROR, "create new concurrent transaction task failed", KR(ret));
       } else if (OB_FAIL(executor_pool_->push_task(task))) {
