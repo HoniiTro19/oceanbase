@@ -723,6 +723,10 @@ int ObDeadlockTransactionTask::execute_transactions()
       TESTBENCH_LOG(WARN, "push forward transaction operations failed", KR(ret));
     }
   }
+  // clear unverified deadlock cycles
+  for (int64_t i = cycle_idx; i < connection_count_; ++i) {
+    latencys_.at(i) = 0;
+  }
   return ret;
 }
 
