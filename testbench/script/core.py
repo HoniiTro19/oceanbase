@@ -726,11 +726,11 @@ class TestBench(object):
         cdf = np.cumsum(counts) / total_count        
         cdf_path = os.path.join(directory, "{}-cdf.pdf".format(type))
         plt.figure()
-        plt.plot(values, cdf, marker="o")
+        plt.plot(values, cdf, marker="o", linestyle="-", linewidth=1, markersize=4)
         plt.xlabel("延迟（毫秒）", fontproperties=font)
         plt.ylabel("累积分布概率", fontproperties=font)
         plt.title("{}的经验累积分布函数图".format(type_name), fontproperties=font)
-        plt.grid(True)
+        plt.grid(linestyle = "--")
         plt.savefig(cdf_path, format="pdf", bbox_inches="tight")
         
         bucket_width = (values[1] - values[0]) / 2 

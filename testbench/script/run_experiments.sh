@@ -111,9 +111,9 @@ function contention_transaction() {
 }
 
 function deadlock_transaction() {
-  delays=(1 20 50)
-  concurrencys=(6 12 18 24 30)
-  chains=(1 2 3)
+  delays=(1)
+  concurrencys=(12 24 36 48 60)
+  chains=(1)
   workload_config="$CONFIG/workload/deadlock_transaction.yaml"
   check_file_exists $workload_config
   for delay in ${delays[@]}; do
@@ -143,13 +143,46 @@ function deadlock_transaction() {
       done
     done
   done
+  
+  concurrencys=(12 24 36 48 60)
+  chains=(1 2 3 4 5)
+  length=${#concurrencys[@]}
+  workload_config="$CONFIG/workload/deadlock_transaction.yaml"
+  check_file_exists $workload_config
+  for ((i=0; i<length; i++)); do
+    sed -i "s/concurrency:.*/concurrency: ${concurrencys[i]}/" $workload_config
+    check_cmd_status "update config concurrency"
+    sed -i "s/chains:.*/chains: ${chains[i]}/" $workload_config
+    check_cmd_status "update config chains"
+
+    deploy_cluster
+
+    sed -i "s/time:.*/time: 5/" $workload_config
+    check_cmd_status "update config time"
+    time=$(date -u +%FT%T%z)
+    trace="deadlocktransaction-concurrency${concurrencys[i]}-chains${chains[i]}-delay1-$time"
+    testbench bench mocknet -c $cluster_config -d 1 -l 0
+    check_cmd_status "simulate network environment"
+    testbench bench test -c $workload_config -t $trace -l
+    check_cmd_status "run deadlock transaction"
+    testbench bench resetnet
+    check_cmd_status "reset network environment"
+    testbench report histogram -d ~/.testbench/scheduler/$trace/log -f ~/linux-fonts/simsun.ttc -s 300
+    check_cmd_status "analyze histogram"    
+  
+    destroy_cluster
+  done
 }
 
 function concurrent_transaction() {
-  delays=(1 20 50)
-  operations=(0 10 20 30)
+  delays=(1)
+  operations=(20)
   readonlys=(0 20 40 60 80 100)
   workload_config="$CONFIG/workload/concurrent_transaction.yaml"
+  sed -i "s/threads:.*/threads: 5/" $workload_config
+  check_cmd_status "update config threads"
+  sed -i "s/concurrency:.*/concurrency: 6/" $workload_config
+  check_cmd_status "update config concurrency"
   check_file_exists $workload_config
   for delay in ${delays[@]}; do
     for operation in ${operations[@]}; do
@@ -177,6 +210,34 @@ function concurrent_transaction() {
         destroy_cluster
       done
     done
+  done
+
+  concurrencys=(12 24 36 48 60 72 84)
+  for concurrency in ${concurrencys[@]}; do
+    sed -i "s/threads:.*/threads: 1/" $workload_config
+    check_cmd_status "update config threads"
+    sed -i "s/operations:.*/operations: 20/" $workload_config
+    check_cmd_status "update config operations"
+    sed -i "s/readonly:.*/readonly: 0/" $workload_config
+    check_cmd_status "update config readonly"
+    sed -i "s/time:.*/time: 5/" $workload_config
+    check_cmd_status "update config time"
+    sed -i "s/concurrency:.*/concurrency: $concurrency/" $workload_config
+    check_cmd_status "update config concurrency"
+
+    deploy_cluster
+    testbench bench mocknet -c $cluster_config -d 20 -l 0
+    check_cmd_status "simulate network environment"
+    time=$(date -u +%FT%T%z)
+    trace="concurrenttransaction-concurrency$concurrency-$time"
+    testbench bench test -c $workload_config -t $trace
+    check_cmd_status "run concurrent transaction"
+    testbench bench resetnet
+    check_cmd_status "reset network environment"
+    testbench report histogram -d ~/.testbench/scheduler/$trace/log -f ~/linux-fonts/simsun.ttc -s 300
+    check_cmd_status "analyze histogram"
+
+    destroy_cluster
   done
 }
 

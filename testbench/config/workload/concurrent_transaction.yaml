@@ -3,7 +3,7 @@ instance_testbench:
   global:
     # common parameters
     log_level: INFO
-    time: 1
+    time: 5
   statistics:
     # for statistics collector
     capacity: 500

@@ -3,7 +3,7 @@ instance_testbench:
   global:
     # common parameters
     log_level: INFO
-    time: 1
+    time: 5
   statistics:
     # for statistics collector
     capacity: 500
@@ -26,5 +26,5 @@ instance_testbench:
   deadlock:
     threads: 10
     tasks: 99999
-    concurrency: 12
-    chains: 2
+    concurrency: 48
+    chains: 1

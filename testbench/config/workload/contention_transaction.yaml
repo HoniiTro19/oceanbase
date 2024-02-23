@@ -26,6 +26,6 @@ instance_testbench:
   contention:
     threads: 10
     tasks: 99999
-    concurrency: 20
-    operations: 20
+    concurrency: 10
+    operations: 10
     aborts: 0
