@@ -723,6 +723,10 @@ int ObDeadlockTransactionTask::execute_transactions()
       TESTBENCH_LOG(WARN, "push forward transaction operations failed", KR(ret));
     }
   }
+  // clear unverified deadlock cycles
+  for (int64_t i = cycle_idx; i < connection_count_; ++i) {
+    latencys_.at(i) = 0;
+  }
   return ret;
 }
 
@@ -898,6 +902,8 @@ int ObConcurrentTransactionTask::collect_statistics()
       if (OB_FAIL(record_latency(ObLatencyTaskType::ROLLBACK_TXN_LATENCY_TASK, cumulative_latencys_.at(conn_idx)))) {
         TESTBENCH_LOG(WARN, "record the latency of rollback transaction failed", KR(ret), "txn_latency", cumulative_latencys_.at(conn_idx));
       }
+    } else if (OB_FAIL(record_latency(ObLatencyTaskType::COMMIT_SQL_LATENCY_TASK, latencys_.at(conn_idx)))) {
+      TESTBENCH_LOG(WARN, "record the latency of commit command failed", KR(ret), "latency", latencys_.at(conn_idx));
     } else if (OB_FAIL(record_latency(ObLatencyTaskType::CONCURRENT_TXN_LATENCY_TASK, cumulative_latencys_.at(conn_idx)))) {
       TESTBENCH_LOG(WARN, "record the latency of concurrent transaction failed", KR(ret), "txn_latency", cumulative_latencys_.at(conn_idx));
     } else {
@@ -965,6 +971,7 @@ int ObConcurrentTransactionTask::push_forward_operations(int64_t conn_idx, int64
       ++current_row_id;
     } else if (act_operations_.at(conn_idx) == operations_) {
       // commit or abort transaction
+      begin_trace_latency(latencys_.at(conn_idx));
       if (OB_FAIL(commits_.at(conn_idx) ? connections_.at(conn_idx)->commit_async() : connections_.at(conn_idx)->rollback_async())) {
         commits_.at(conn_idx) = false;
         TESTBENCH_LOG(WARN, "execute commit/rollback async failed", KR(ret), "is_commit", commits_.at(conn_idx));
@@ -972,6 +979,7 @@ int ObConcurrentTransactionTask::push_forward_operations(int64_t conn_idx, int64
       ++act_operations_.at(conn_idx);
     } else {
       ++finished_;
+      end_trace_latency(latencys_.at(conn_idx));
       end_trace_latency(cumulative_latencys_.at(conn_idx));
       break;
     }

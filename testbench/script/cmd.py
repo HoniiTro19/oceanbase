@@ -469,6 +469,8 @@ class BenchTestCommand(TestBenchCommand):
         need_lcl = getattr(self.opts, "lcl", False)
         if need_elr:
             self._do_step("Enabling elr for contention transactions.", tb.enable_elr)
+        else:
+            self._do_step("Disabling elr for contention transactions.", tb.reset_elr)
         if need_lcl:
             self._do_step("Enabling lcl for deadlock transactions.", tb.enable_lcl)
         self._do_step("Starting testbench scheduler.", tb.start_scheduler)
