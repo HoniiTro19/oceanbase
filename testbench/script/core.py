@@ -698,7 +698,7 @@ class TestBench(object):
     
     def _analyze_histogram(self, type, values, counts, directory):
         font_path = getattr(self._opts, "font", "")
-        font = FontProperties(fname=font_path, size=14)
+        font = FontProperties(fname=font_path, size=20)
         plt.rcParams['pdf.fonttype'] = 42
         
         # trim leading and trailing zeros
@@ -712,15 +712,19 @@ class TestBench(object):
             values.pop()
             
         total_count = np.sum(counts)
-        cdf = np.cumsum(counts) / total_count        
+        cdf = np.cumsum(counts) * 100 / total_count      
         cdf_path = os.path.join(directory, "{}-cdf.pdf".format(type))
-        plt.figure()
+        plt.figure(figsize=[6., 4.])
+        plt.grid(linestyle = ":")
         color = tuple(x / 255 for x in [72, 68, 95])
         values_ms = np.array(values) / 1000
-        plt.plot(values_ms, cdf, color=color, linestyle="-", linewidth=1.5)
-        plt.xlabel("延迟分布（毫秒）", fontproperties=font)
+        plt.plot(values_ms, cdf, color=color, linestyle="-", linewidth=1.5, label="事务等锁延迟分布")
+        plt.xlabel("事务等锁延迟分布（毫秒）", fontproperties=font)
         plt.ylabel("累积分布概率（%）", fontproperties=font)
-        plt.grid(linestyle = ":")
+        plt.legend(loc=0, numpoints=1)
+        leg = plt.gca().get_legend()
+        ltext = leg.get_texts()
+        plt.setp(ltext, fontproperties=font)
         plt.savefig(cdf_path, format="pdf", bbox_inches="tight")
         
         bucket_width = (values[1] - values[0]) / 2 
