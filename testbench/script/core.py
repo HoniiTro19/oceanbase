@@ -721,6 +721,8 @@ class TestBench(object):
         plt.plot(values_ms, cdf, color=color, linestyle="-", linewidth=1.5, label="事务等锁延迟分布")
         plt.xlabel("事务等锁延迟分布（毫秒）", fontproperties=font)
         plt.ylabel("累积分布概率（%）", fontproperties=font)
+        plt.xticks(fontproperties=font)
+        plt.yticks(fontproperties=font)
         plt.legend(loc=0, numpoints=1)
         leg = plt.gca().get_legend()
         ltext = leg.get_texts()

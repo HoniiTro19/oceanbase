@@ -241,6 +241,16 @@ function concurrent_transaction() {
   done
 }
 
+function location_cache() {
+  threads=(1 5 10 15 20)
+  intervals=(1 5 10 15 20)
+  for thread in ${threads[@]}; do
+    for interval in ${intervals[@]}; do
+      ../../build_release/mittest/testbench/test_testbench_location_cache -d 60 -i $interval -t $thread --gtest_output=xml:location-cache-thread$thread-interval$interval.xml
+    done
+  done
+}
+
 if [ $# -le 1 ] ; then
   echo "Usage: $(basename $0) CONFIG FUNCTION" >&2
   exit 1
