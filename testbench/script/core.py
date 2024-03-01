@@ -24,7 +24,6 @@ import os
 import bisect
 import numpy as np
 import matplotlib.pyplot as plt
-from matplotlib.font_manager import FontProperties 
 
 from cluster import ClusterManager
 from dataset import DatasetManager
@@ -34,6 +33,9 @@ from scheduler import SchedulerManager
 from client import LocalClient, MySQLClient, MySQL
 from tool import FileUtil, DirectoryUtil
 
+plt.rcParams['font.sans-serif'] = ['SimSun']
+plt.rcParams['font.size'] = 20
+        
 class TestBench(object):
     def __init__(self, home_path, opts, stdio=None):
         self._opts = opts
@@ -671,23 +673,12 @@ class TestBench(object):
         endpoint_counts = []
         endpoint_values = []
         is_value = False
-        type_name_map = {
-            "distributed_txn": "分布式事务延迟",
-            "contention_txn": "冲突事务延迟",
-            "deadlock_txn": "全局死锁事务延迟",
-            "concurrent_txn": "读写事务延迟",
-            "commit": "事务提交操作延迟",
-            "lock": "事务冲突操作等锁时间",
-            "deadlock": "死锁环路检测与消除延迟",
-            "election": "选主时间",
-            "rollback_txn": "回滚事务延迟",            
-        }
         while True:
             line = file.readline().strip("\n").strip()
             if not line:
                 break
             elif line == "end":
-                if not self._analyze_histogram(histogram_type, type_name_map[histogram_type], endpoint_values, endpoint_counts, directory):
+                if not self._analyze_histogram(histogram_type, endpoint_values, endpoint_counts, directory):
                     self.stdio.error(
                         "Fail to analyze histogram data, type: {}, values: {}, counts: {}".format(histogram_type, endpoint_values, endpoint_counts)
                     )
@@ -707,11 +698,7 @@ class TestBench(object):
         file.close()
         return True
     
-    def _analyze_histogram(self, type, type_name, values, counts, directory):
-        font_path = getattr(self._opts, "font", "")
-        font = FontProperties(fname=font_path, size=14)
-        plt.rcParams['pdf.fonttype'] = 42
-        
+    def _analyze_histogram(self, type, values, counts, directory):
         # trim leading and trailing zeros
         self.stdio.verbose("type: {}, values(len={}): {}, counts(len={}): {}".format(type, len(values), values, len(counts), counts))
         second = int(getattr(self._opts, "second", "1"))
@@ -723,14 +710,16 @@ class TestBench(object):
             values.pop()
             
         total_count = np.sum(counts)
-        cdf = np.cumsum(counts) / total_count        
+        cdf = np.cumsum(counts) * 100 / total_count      
         cdf_path = os.path.join(directory, "{}-cdf.pdf".format(type))
-        plt.figure()
-        plt.plot(values, cdf, marker="o", linestyle="-", linewidth=1, markersize=4)
-        plt.xlabel("延迟（毫秒）", fontproperties=font)
-        plt.ylabel("累积分布概率", fontproperties=font)
-        plt.title("{}的经验累积分布函数图".format(type_name), fontproperties=font)
-        plt.grid(linestyle = "--")
+        plt.figure(figsize=[6., 4.])
+        plt.grid(linestyle = ":")
+        color = tuple(x / 255 for x in [72, 68, 95])
+        values_ms = np.array(values) / 1000
+        plt.plot(values_ms, cdf, color=color, linestyle="-", linewidth=1.5, label="事务等锁延迟分布")
+        plt.xlabel("事务等锁延迟分布（毫秒）")
+        plt.ylabel("累积分布概率（%）")
+        plt.legend(loc=0, numpoints=1)
         plt.savefig(cdf_path, format="pdf", bbox_inches="tight")
         
         bucket_width = (values[1] - values[0]) / 2 

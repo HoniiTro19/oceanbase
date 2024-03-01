@@ -545,9 +545,6 @@ class ReportHistogramInfo(TestBenchCommand):
             "-d", "--directory", type="string", help="Path to the benchmark log directory."
         )
         self.parser.add_option(
-            "-f", "--font", type="string", help="Path to chinese font."
-        )
-        self.parser.add_option(
             "-s", "--second", type="int", help="Time elapsed during benchmark tool execution."
         )
         
@@ -559,10 +556,6 @@ class ReportHistogramInfo(TestBenchCommand):
         result = os.path.join(directory, "scheduler.result")
         if not os.path.exists(result):
             ROOT_IO.error("Result file scheduler.result does not exists, {}.".format(result))
-            return False
-        font = getattr(self.opts, "font", None)
-        if font and not os.path.exists(font):
-            ROOT_IO.error("Font file does not exists, {}.".format(font))
             return False
         second = int(getattr(self.opts, "second", "-1"))
         if second <= 0:
