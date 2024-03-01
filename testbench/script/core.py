@@ -24,7 +24,6 @@ import os
 import bisect
 import numpy as np
 import matplotlib.pyplot as plt
-from matplotlib.font_manager import FontProperties 
 
 from cluster import ClusterManager
 from dataset import DatasetManager
@@ -34,6 +33,9 @@ from scheduler import SchedulerManager
 from client import LocalClient, MySQLClient, MySQL
 from tool import FileUtil, DirectoryUtil
 
+plt.rcParams['font.sans-serif'] = ['SimSun']
+plt.rcParams['font.size'] = 20
+        
 class TestBench(object):
     def __init__(self, home_path, opts, stdio=None):
         self._opts = opts
@@ -697,10 +699,6 @@ class TestBench(object):
         return True
     
     def _analyze_histogram(self, type, values, counts, directory):
-        font_path = getattr(self._opts, "font", "")
-        font = FontProperties(fname=font_path, size=20)
-        plt.rcParams['pdf.fonttype'] = 42
-        
         # trim leading and trailing zeros
         self.stdio.verbose("type: {}, values(len={}): {}, counts(len={}): {}".format(type, len(values), values, len(counts), counts))
         second = int(getattr(self._opts, "second", "1"))
@@ -719,14 +717,9 @@ class TestBench(object):
         color = tuple(x / 255 for x in [72, 68, 95])
         values_ms = np.array(values) / 1000
         plt.plot(values_ms, cdf, color=color, linestyle="-", linewidth=1.5, label="事务等锁延迟分布")
-        plt.xlabel("事务等锁延迟分布（毫秒）", fontproperties=font)
-        plt.ylabel("累积分布概率（%）", fontproperties=font)
-        plt.xticks(fontproperties=font)
-        plt.yticks(fontproperties=font)
+        plt.xlabel("事务等锁延迟分布（毫秒）")
+        plt.ylabel("累积分布概率（%）")
         plt.legend(loc=0, numpoints=1)
-        leg = plt.gca().get_legend()
-        ltext = leg.get_texts()
-        plt.setp(ltext, fontproperties=font)
         plt.savefig(cdf_path, format="pdf", bbox_inches="tight")
         
         bucket_width = (values[1] - values[0]) / 2 
