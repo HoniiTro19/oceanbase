@@ -68,6 +68,7 @@ using namespace palf::election;
 using namespace std;
 using namespace logservice::coordinator;
 
+int64_t MSG_LOSS = 0;
 int64_t MSG_DELAY = 1_ms;
 std::atomic_int leader_takeover_times(0);
 std::atomic_int leader_revoke_times(0);
