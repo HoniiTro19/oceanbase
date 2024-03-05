@@ -28,6 +28,7 @@ namespace oceanbase
 namespace unittest
 {
 
+extern int64_t MSG_LOSS;
 extern int64_t MSG_DELAY;
 
 // 定义用于hash map的判等方法
@@ -76,6 +77,7 @@ thread_local MsgBuffer TH_BUFFER;
 // 全局的timer 和 thread pool，用于模拟网络延迟和接收端的工作线程
 ObOccamTimer TIMER;
 ObOccamThreadPool THREAD_POOL;
+ObRandom random;
 
 // 这是收发消息的方法
 class MockNetService : public ElectionMsgSender
@@ -211,11 +213,14 @@ private:
     serialization::encode(TH_BUFFER.buffer_, BUFFER_SIZE, pos, int64_t(msg.get_msg_type()));
     msg.serialize(TH_BUFFER.buffer_, BUFFER_SIZE, pos);
     auto iter = map_.find({msg.get_sender(), msg.get_receiver()});
+    bool isloss = random.rand(1, 100) < MSG_LOSS;
     if (iter != map_.end()) {
       auto election = iter->second;
       auto buffer = TH_BUFFER;
       int ret = common::OB_SUCCESS;
-      if (MSG_DELAY == 0) {
+      if (isloss) {
+        ELECT_LOG(INFO, "skip the message");
+      } else if (MSG_DELAY == 0) {
         ret = THREAD_POOL.commit_task_ignore_ret([buffer, election, ret, this]() mutable {
           int64_t begin = ObClockGenerator::getRealClock();
           this->decode_and_process_buffer(buffer, election);

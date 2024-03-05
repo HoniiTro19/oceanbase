@@ -251,6 +251,24 @@ function location_cache() {
   done
 }
 
+function election() {
+  times=100
+  groups=100  
+  tsts=(400 600 800 1000)
+  delays=(1 50 100 150)
+  losses=(0 5 10 15)
+  for tst in ${tsts[@]}; do
+    for delay in ${delays[@]}; do
+      for loss in ${losses[@]}; do
+        result="tst$tst-delay$delay-loss$loss"
+        for ((i=0; i<$times; i++)); do
+          ../../build_release/unittest/logservice/test_ob_election -r $result -g $groups -t $tst -d $delay -l $loss --gtest_filter="TestElection.test_ob_election_performance"
+        done
+      done
+    done
+  done
+}
+
 if [ $# -le 1 ] ; then
   echo "Usage: $(basename $0) CONFIG FUNCTION" >&2
   exit 1

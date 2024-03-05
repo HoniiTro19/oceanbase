@@ -39,6 +39,12 @@ using namespace std;
 #define TRUE_(stmt) ASSERT_EQ((stmt), true)
 #define FALSE_(stmt) ASSERT_EQ((stmt), false)
 
+static bool perf_force = false;
+static int64_t perf_rounds = 1;
+static int64_t perf_groups = 1; 
+static unsigned long long perf_max_tst = 1 * 1000 * 1000L;
+static char result_file[OB_MAX_CONTEXT_STRING_LENGTH] = "test_ob_election_perf.result";
+
 namespace oceanbase {
 namespace palf
 {
@@ -57,6 +63,7 @@ using namespace palf::election;
 using namespace std;
 using namespace logservice::coordinator;
 
+int64_t MSG_LOSS = 0;
 int64_t MSG_DELAY = 1_ms;
 std::atomic_int leader_takeover_times(0);
 std::atomic_int leader_revoke_times(0);
@@ -235,6 +242,75 @@ void calculate_and_print_max_min_average(const vector<int64_t> &leader_takeover_
   }
   average /= group_size;
   ELECT_LOG(INFO, "no leader info summary", K(min), K(min_idx), K(max), K(max_idx), K(average));
+}
+
+
+TEST_F(TestElection, test_ob_election_performance) {
+  MAX_TST = perf_max_tst;
+  MSG_DELAY = 0;
+  std::vector<std::vector<ElectionImpl *>> election_groups;
+  std::vector<int64_t> reelect_times;
+  reelect_times.resize(perf_groups);
+  unsigned int mode = 0644;
+  int32_t fd = -1;
+  if (perf_force) {
+    remove(result_file);
+  }
+  ASSERT_GT(fd = ::open(result_file, O_WRONLY | O_CREAT | O_APPEND, mode), 0);
+  for (int64_t i = 0; i < perf_groups; ++i) {
+    int64_t *leader_takeover_time = &reelect_times[i];
+    auto takeover_op = [leader_takeover_time]() {
+      *leader_takeover_time = get_monotonic_ts() - *leader_takeover_time;
+    };
+    election_groups.push_back(create_election_group(3, {0, 0, 0}, takeover_op));
+  }
+  for (int64_t i = 0; i < perf_groups; ++i) {
+    int64_t j = 0;
+    common::ObRole role;
+    int64_t epoch = -1;
+    while (true) {
+      ElectionImpl *node = election_groups[i][j];
+      ASSERT_EQ(OB_SUCCESS, node->get_role(role, epoch));
+      if (common::ObRole::LEADER == role) {
+        node->stop();
+        reelect_times[i] = get_monotonic_ts();
+        break;
+      }
+      j = (j + 1) % 3;
+    }
+  }
+  for (int64_t i = 0; i < perf_groups; ++i) {
+    int64_t j = 0;
+    common::ObRole role;
+    int64_t epoch = -1;
+    while (true) {
+      ElectionImpl *node = election_groups[i][j];
+      if (node->is_running_) {
+        ASSERT_EQ(OB_SUCCESS, node->get_role(role, epoch));
+        if (common::ObRole::LEADER == role) {
+          break;
+        }
+      }
+      j = (j + 1) % 3;
+    }
+    ELECT_LOG(INFO, "find leader reelected in group", "group", i);
+  }
+  for (auto &group : election_groups) {
+    for (auto &node : group) {
+      node->stop();
+      delete node;
+    }
+  }
+  ASSERT_EQ(leader_takeover_times, 2 * perf_groups);
+  ASSERT_EQ(leader_revoke_times, 2 * perf_groups);
+  ASSERT_EQ(devote_to_be_leader_count, 2 * perf_groups);
+  ASSERT_EQ(stop_to_be_follower_count, 2 * perf_groups);
+  static const int64_t max_buf_len = 512;
+  char buf[max_buf_len];
+  for (int64_t time : reelect_times) {
+    snprintf(buf, max_buf_len, "%ld\n", time);
+    ASSERT_GE(::write(fd, buf, strlen(buf)), 0);
+  }
 }
 
 // TEST_F(TestElection, test_no_leader_time_with_400ms_msg_delay) {
@@ -613,5 +689,44 @@ int main(int argc, char **argv)
   logger.set_file_name("test_ob_election.log", false);
   logger.set_log_level(OB_LOG_LEVEL_TRACE);
   testing::InitGoogleTest(&argc, argv);
+  if (argc > 1) {
+    for (int i = 1; i < argc; ++i) {
+      if (strcmp(argv[i], "-f") == 0) {
+        perf_force = true;
+      } else if (strcmp(argv[i], "-r") == 0) {
+        if (i < argc - 1) {
+          snprintf(result_file, OB_MAX_CONTEXT_STRING_LENGTH, "%s", argv[i + 1]);
+        } else {
+          std::cerr << "cannot find value for argument: " << argv[i] << std::endl;
+        }
+        ++i;
+      } else if (strcmp(argv[i], "-g") == 0) {
+        if (i < argc - 1) {
+          perf_groups = std::stoi(argv[i + 1]);
+        } else {
+          std::cerr << "cannot find value for argument: " << argv[i] << std::endl;
+        }
+        ++i;
+      } else if (strcmp(argv[i], "-t") == 0) {
+        if (i < argc - 1) {
+          perf_max_tst = std::stoi(argv[i + 1]) * 1000L;
+        } else {
+          std::cerr << "cannot find value for argument: " << argv[i] << std::endl;
+        }
+      } else if (strcmp(argv[i], "-d") == 0) {
+        if (i < argc - 1) {
+          oceanbase::unittest::MSG_DELAY = std::stoi(argv[i + 1]) * 1000L;
+        } else {
+          std::cerr << "cannot find value for argument: " << argv[i] << std::endl;
+        }
+      } else if (strcmp(argv[i], "-l") == 0) {
+        if (i < argc - 1) {
+          oceanbase::unittest::MSG_LOSS = std::stoi(argv[i + 1]);
+        } else {
+          std::cerr << "cannot find value for argument: " << argv[i] << std::endl;
+        }
+      }
+    }
+  }
   return RUN_ALL_TESTS();
 }

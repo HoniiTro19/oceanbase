@@ -488,6 +488,9 @@ class BenchMocknetCommand(TestBenchCommand):
             "-c", "--config", type="string", help="Path to the cluster configuration file."
         )
         self.parser.add_option(
+            "-p", "--ports", type="string", help="comma separated ports to add delays and losses."
+        )
+        self.parser.add_option(
             "-d", "--delay", type="int", help="Millisecond-level network latency."
         )
         self.parser.add_option(
@@ -496,10 +499,11 @@ class BenchMocknetCommand(TestBenchCommand):
     
     def _check(self):
         config = getattr(self.opts, "config", None)
-        if not config:
-            ROOT_IO.error("Fail to set mocknet without cluster configuration file.")
+        ports = getattr(self.opts, "ports", None)
+        if not config and not ports:
+            ROOT_IO.error("Fail to set mocknet without cluster configuration file and ports.")
             return False
-        if not os.path.exists(config):
+        if config and not os.path.exists(config):
             ROOT_IO.error("Configuration file {} does not exists.".format(config))
             return False
         

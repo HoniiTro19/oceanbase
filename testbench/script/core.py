@@ -609,13 +609,22 @@ class TestBench(object):
         return True
     
     def enable_mocknet(self):
-        config = getattr(self._opts, "config", "")
-        if not self.cluster_manager.create_yaml(config):
-            self.stdio.error(
-                "Fail to load cluster config for testbench {}".format(config)
+        config = getattr(self._opts, "config", None)
+        ports = getattr(self._opts, "ports", None)
+        rpc_port_list = None
+        if ports is None:
+            if not self.cluster_manager.create_yaml(config):
+                self.stdio.error(
+                    "Fail to load cluster config for testbench {}".format(config)
+                )
+                return False
+            else:
+                rpc_port_list = self.cluster_manager.get_rpc_port_list()
+        else:
+            rpc_port_list = ports.split(",")
+            self.stdio.verbose(
+                "Parse port config string {}, {}".format(ports, rpc_port_list)
             )
-            return False
-        rpc_port_list = self.cluster_manager.get_rpc_port_list()
         delay = getattr(self._opts, "delay", "0")
         loss = getattr(self._opts, "loss", "0")
         add_qdisc_cmd = "sudo tc qdisc add dev lo root handle 1: prio bands 4"
