@@ -58,6 +58,12 @@ void *oceanbase::common::ob_malloc_align(const int64_t alignment, const int64_t 
   return ob_malloc_align(alignment, nbyte, attr);
 }
 
+// 对齐后的内存块初始地址是max(min_align, align_up2(align, 16))的整数倍
+// ob_malloc申请的内存初始地址可能不满足上述条件，需要向高地址位做padding
+// padding的字节数量通过sign_ptr和header_ptr记录，方面正确释放所有申请的内存
+// Memory Layout:
+// 0x1000 (ptr)                0x101F (sign_ptr)     0x1020 (align_ptr)
+// |<--- padding (32 bytes) --->| (stores 32)        |<--- usable memory (100 bytes) --->|
 void *oceanbase::common::ob_malloc_align(const int64_t align, const int64_t nbyte,
                                          const ObMemAttr &attr)
 {

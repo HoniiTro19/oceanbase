@@ -67,6 +67,8 @@ public:
 
 extern ObIAllocator *global_default_allocator;
 
+// 将虚基类ObIAllocator的alloc，realloc和free等接口做一个包装
+// 避免每次调用虚基类时判空？？？
 class ObWrapperAllocator: public ObIAllocator
 {
 public:
@@ -105,6 +107,7 @@ public:
   }
   const ObIAllocator *get_alloc() const { return alloc_;}
   ObIAllocator *get_alloc() { return alloc_;}
+  // 找到虚类成员alloc_在ObWrapperAllocator对象的地址
   static uint32_t alloc_offset_bits()
   {
 DISABLE_WARNING_GCC_PUSH
